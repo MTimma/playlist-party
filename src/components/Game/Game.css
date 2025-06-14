@@ -1,0 +1,119 @@
+.game-container {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+  color: white;
+}
+
+.game-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.player-scores {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
+.player-score {
+  background-color: #2d2d2d;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  min-width: 150px;
+}
+
+.game-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.current-song {
+  background-color: #2d2d2d;
+  padding: 2rem;
+  border-radius: 1rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.song-controls {
+  margin-top: 1rem;
+}
+
+.play-button,
+.pause-button {
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.play-button {
+  background-color: #1db954;
+  color: white;
+}
+
+.play-button:hover {
+  background-color: #1ed760;
+}
+
+.pause-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.pause-button:hover {
+  background-color: #c0392b;
+}
+
+.player-guesses {
+  background-color: #2d2d2d;
+  padding: 2rem;
+  border-radius: 1rem;
+}
+
+.player-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.player-button {
+  padding: 1rem;
+  border: 2px solid #3d3d3d;
+  border-radius: 0.5rem;
+  background-color: #2d2d2d;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.player-button:hover:not(:disabled) {
+  border-color: #1db954;
+  background-color: #1db954;
+}
+
+.player-button.selected {
+  border-color: #1db954;
+  background-color: #1db954;
+}
+
+.player-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-size: 1.5rem;
+  color: white;
+} 
