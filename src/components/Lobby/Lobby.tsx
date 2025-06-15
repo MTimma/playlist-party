@@ -7,32 +7,43 @@ import './Lobby.css';
 export const Lobby = () => {
   const [playerName, setPlayerName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [spotifyToken, setSpotifyToken] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [spotifyUser, setSpotifyUser] = useState<any>(null);
   const navigate = useNavigate();
 
-  // Handle Spotify OAuth callback
   useEffect(() => {
-    if (window.location.hash.includes('access_token')) {
-      const params = new URLSearchParams(window.location.hash.replace('#', '?'));
-      const token = params.get('access_token');
-      if (token) {
-        setSpotifyToken(token);
-        localStorage.setItem('spotify_token', token);
-        window.location.hash = '';
-      }
-    } else {
-      const token = localStorage.getItem('spotify_token');
-      if (token) setSpotifyToken(token);
-    }
+    checkAuthStatus();
   }, []);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetch(`${import.meta.env.VITE_BACKEND_URL}/me`, {
+        credentials: 'include',
+      })
+        .then(res => res.json())
+        .then(data => setSpotifyUser(data))
+        .catch(() => setSpotifyUser(null));
+    }
+  }, [isAuthenticated]);
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/status`, {
+        credentials: 'include',
+      });
+      const data = await response.json();
+      setIsAuthenticated(data.isAuthenticated);
+    } catch {
+      setIsAuthenticated(false);
+    }
+  };
+
   const handleSpotifyLogin = () => {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL;
-    window.location.href = `${backendUrl}/login`;
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/login`;
   };
 
   const handleCreateGame = async () => {
-    if (!playerName.trim() || !spotifyToken) return;
+    if (!playerName.trim() || !isAuthenticated) return;
     setIsCreating(true);
     try {
       const host: Player = {
@@ -49,14 +60,25 @@ export const Lobby = () => {
     }
   };
 
-
   return (
     <div className="lobby-container">
       <h1 className="text-4xl font-bold mb-8">Music Guessing Game</h1>
-      {!spotifyToken ? (
+      {!isAuthenticated ? (
         <button className="lobby-button" onClick={handleSpotifyLogin}>
           Login with Spotify
         </button>
+      ) : spotifyUser ? (
+        <div>
+          <p>Welcome, {spotifyUser.display_name}!</p>
+          {spotifyUser.images && spotifyUser.images.length > 0 && (
+            <img
+              src={spotifyUser.images[0].url}
+              alt="Spotify profile"
+              style={{ width: 64, height: 64, borderRadius: '50%', marginBottom: 8 }}
+            />
+          )}
+          {/* You can add a logout button or other UI here */}
+        </div>
       ) : (
         <div className="lobby-form">
           <input

@@ -1,13 +1,53 @@
-import express from 'express';
+import express, { RequestHandler } from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
 
 dotenv.config();
 
+// Validate required environment variables
+const requiredEnvVars = [
+  'SPOTIFY_CLIENT_ID',
+  'SPOTIFY_CLIENT_SECRET',
+  'SPOTIFY_REDIRECT_URI',
+  'FRONTEND_URL'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingEnvVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+}
+
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for static files
+}));
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // Cache preflight request for 10 minutes
+}));
+app.use(express.json({ limit: '10kb' })); // Limit payload size
+app.use(cookieParser());
+
+// Rate limiting middleware
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID!;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
@@ -46,12 +86,35 @@ app.get('/callback', (req, res) => {
       const tokenRes = await axios.post(
         `${SPOTIFY_ACCOUNTS_URL}/api/token`,
         params,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        { 
+          headers: { 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          timeout: 5000 // 5 second timeout
+        }
       );
 
-      // Redirect to frontend with tokens in query (or send as JSON)
-      res.redirect(`${FRONTEND_URL}/callback?access_token=${tokenRes.data.access_token}&refresh_token=${tokenRes.data.refresh_token}`);
+      // Set tokens in httpOnly cookies with enhanced security
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax' as const,
+        domain: new URL(FRONTEND_URL).hostname,
+        path: '/',
+        maxAge: tokenRes.data.expires_in * 1000
+      };
+
+      res.cookie('spotify_access_token', tokenRes.data.access_token, cookieOptions);
+      res.cookie('spotify_refresh_token', tokenRes.data.refresh_token, {
+        ...cookieOptions,
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days for refresh token
+      });
+
+      // Redirect to frontend
+      res.redirect(`${FRONTEND_URL}/callback`);
     } catch (err: unknown) {
+      console.error('Token exchange error:', err);
       if (axios.isAxiosError(err)) {
         res.status(500).json({ error: 'Failed to get tokens', details: err.response?.data || err.message });
       } else if (err instanceof Error) {
@@ -62,6 +125,55 @@ app.get('/callback', (req, res) => {
     }
   })();
 });
+
+// 3. Get current access token
+app.get('/auth/token', ((req, res) => {
+  try {
+    const accessToken = req.cookies.spotify_access_token;
+    if (!accessToken) {
+      return res.status(401).json({ error: 'No access token' });
+    }
+    res.json({ accessToken });
+  } catch {
+    res.status(500).json({ error: 'Failed to get token' });
+  }
+}) as RequestHandler);
+
+// 4. Check authentication status
+app.get('/auth/status', (req, res) => {
+  const accessToken = req.cookies.spotify_access_token;
+  res.json({ isAuthenticated: !!accessToken });
+});
+
+// 5. Logout
+app.post('/auth/logout', (_req, res) => {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    domain: new URL(FRONTEND_URL).hostname,
+    path: '/'
+  };
+
+  res.clearCookie('spotify_access_token', cookieOptions);
+  res.clearCookie('spotify_refresh_token', cookieOptions);
+  res.json({ success: true });
+});
+
+app.get('/me', (async (req, res) => {
+  const accessToken = req.cookies.spotify_access_token;
+  if (!accessToken) {
+    return res.status(401).json({ error: 'No access token' });
+  }
+  try {
+    const userRes = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    res.json(userRes.data);
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+}) as RequestHandler);
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8888;
 app.listen(PORT, () => {
