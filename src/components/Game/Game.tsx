@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { subscribeToGame, updateGameState, joinGame } from '../../services/firebase';
 import { playSong, pauseSong } from '../../services/spotify';
-import type { GameState, Player } from '../../types';
+import type { GameState, Player } from '../../types/types';
 import './Game.css';
 
 export const Game = () => {

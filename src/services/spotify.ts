@@ -1,5 +1,5 @@
 import SpotifyWebApi from 'spotify-web-api-node';
-import type { Song } from '../types';
+import type { Song } from '../types/types';
 
 const spotifyApi = new SpotifyWebApi({
   clientId: import.meta.env.VITE_SPOTIFY_CLIENT_ID,
