@@ -34,8 +34,10 @@ const auth = getAuth(app);
 // Auth functions
 export const signInAnonymouslyIfNeeded = async (): Promise<User> => {
   return new Promise((resolve, reject) => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      unsubscribe();
+    let unsubscribe: (() => void) | null = null;
+    
+    unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (unsubscribe) unsubscribe();
       if (user) {
         resolve(user);
       } else {
@@ -141,6 +143,10 @@ export const getLobby = async (lobbyId: string): Promise<Lobby | null> => {
   }
   
   const data = lobbyDoc.data();
+  if (!data) {
+    return null;
+  }
+  
   return {
     ...data,
     createdAt: data.createdAt?.toDate() || new Date()

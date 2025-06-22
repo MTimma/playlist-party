@@ -1,4 +1,5 @@
 import type { Player } from '../../types/types';
+import { Timestamp } from 'firebase/firestore';
 import './PlayerList.css';
 
 interface PlayerListProps {
@@ -11,9 +12,26 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
   const playerArray = Object.values(players);
   const currentPlayerCount = playerArray.length;
 
-  const formatJoinTime = (joinedAt: Date) => {
+  const formatJoinTime = (joinedAt: Date | Timestamp) => {
     const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - joinedAt.getTime()) / 1000);
+    // Handle both Date objects and Firestore Timestamps
+    let joinTime: Date;
+    
+    if (joinedAt instanceof Timestamp) {
+      joinTime = joinedAt.toDate();
+    } else if (joinedAt instanceof Date) {
+      joinTime = joinedAt;
+    } else {
+      // Handle string dates or other formats
+      joinTime = new Date(joinedAt);
+    }
+    
+    // Validate that we have a valid date
+    if (isNaN(joinTime.getTime())) {
+      return 'Just joined';
+    }
+    
+    const diffInSeconds = Math.floor((now.getTime() - joinTime.getTime()) / 1000);
     
     if (diffInSeconds < 60) {
       return 'Just joined';
@@ -93,7 +111,7 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
             </div>
 
             <div className="player-status">
-              <div className="status-indicator online"></div>
+              <div className="status-indicator online" data-testid="status-indicator"></div>
             </div>
           </div>
         ))}

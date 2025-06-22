@@ -1,8 +1,10 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface Player {
   id: string;
   name: string;
   isHost: boolean;
-  joinedAt: Date;
+  joinedAt: Date | Timestamp;
   score: number;
   avatarUrl?: string;
 }
@@ -25,7 +27,7 @@ export interface Lobby {
   hostSpotifyUserId: string;
   playlistId?: string;
   status: 'waiting' | 'collecting_songs' | 'in_progress' | 'finished';
-  createdAt: Date;
+  createdAt: Date | Timestamp;
   maxPlayers: number;
   currentRound?: number;
   players: {
@@ -40,7 +42,7 @@ export interface PlaylistCollection {
     [trackUri: string]: {
       addedBy: string;
       trackInfo: Track;
-      addedAt: Date;
+      addedAt: Date | Timestamp;
     };
   };
   stats: {
@@ -54,7 +56,7 @@ export interface TrackProposal {
   proposedBy: string;
   trackInfo: Track;
   status: 'pending' | 'approved' | 'rejected';
-  proposedAt: Date;
+  proposedAt: Date | Timestamp;
   reason?: string; // For rejection reason
 }
 
