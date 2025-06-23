@@ -7,6 +7,7 @@ export interface Player {
   joinedAt: Date | Timestamp;
   score: number;
   avatarUrl?: string;
+  hasAddedSongs?: boolean;
 }
 
 export interface Track {

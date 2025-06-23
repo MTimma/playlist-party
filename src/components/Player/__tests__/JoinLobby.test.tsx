@@ -1,46 +1,41 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { JoinLobby } from '../JoinLobby'
-import { joinLobby } from '../../../services/firebase'
+
+// Mock Firebase service
+vi.mock('../../../services/firebase', () => ({
+  joinLobby: vi.fn(),
+}))
 
 // Mock the navigate function
 const mockNavigate = vi.fn()
+let mockSearchParams = new URLSearchParams()
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-    useSearchParams: () => [new URLSearchParams('lobby=test-lobby-id')],
+    useSearchParams: () => [mockSearchParams],
   }
 })
-
-const renderJoinLobby = (searchParams = '') => {
-  // Mock useSearchParams based on test needs
-  vi.mocked(vi.importActual('react-router-dom')).useSearchParams = () => [
-    new URLSearchParams(searchParams)
-  ]
-  
-  return render(
-    <BrowserRouter>
-      <JoinLobby />
-    </BrowserRouter>
-  )
-}
 
 describe('JoinLobby Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    vi.resetAllMocks()
+    mockNavigate.mockClear()
+    mockSearchParams = new URLSearchParams()
   })
 
   describe('Component Rendering', () => {
     it('should render join lobby form correctly', () => {
-      renderJoinLobby()
+      render(
+        <BrowserRouter>
+          <JoinLobby />
+        </BrowserRouter>
+      )
 
       expect(screen.getByText('Join Game Lobby')).toBeInTheDocument()
       expect(screen.getByText('Enter the lobby details to join the music guessing game')).toBeInTheDocument()
@@ -50,14 +45,22 @@ describe('JoinLobby Component', () => {
     })
 
     it('should show alternative action to create lobby', () => {
-      renderJoinLobby()
+      render(
+        <BrowserRouter>
+          <JoinLobby />
+        </BrowserRouter>
+      )
 
       expect(screen.getByText('Want to host a game instead?')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Create Lobby' })).toBeInTheDocument()
     })
 
     it('should show no Spotify required message', () => {
-      renderJoinLobby()
+      render(
+        <BrowserRouter>
+          <JoinLobby />
+        </BrowserRouter>
+      )
 
       expect(screen.getByText('No Spotify account required to join as a player')).toBeInTheDocument()
     })
@@ -65,16 +68,7 @@ describe('JoinLobby Component', () => {
 
   describe('URL Parameter Handling', () => {
     it('should pre-fill lobby ID from URL parameter', () => {
-      // Mock useSearchParams to return lobby parameter
-      const mockSearchParams = new URLSearchParams('lobby=url-lobby-id')
-      vi.doMock('react-router-dom', async () => {
-        const actual = await vi.importActual('react-router-dom')
-        return {
-          ...actual,
-          useNavigate: () => mockNavigate,
-          useSearchParams: () => [mockSearchParams],
-        }
-      })
+      mockSearchParams = new URLSearchParams('lobby=url-lobby-id')
 
       render(
         <BrowserRouter>
@@ -87,15 +81,7 @@ describe('JoinLobby Component', () => {
     })
 
     it('should disable lobby ID input when provided via URL', () => {
-      const mockSearchParams = new URLSearchParams('lobby=url-lobby-id')
-      vi.doMock('react-router-dom', async () => {
-        const actual = await vi.importActual('react-router-dom')
-        return {
-          ...actual,
-          useNavigate: () => mockNavigate,
-          useSearchParams: () => [mockSearchParams],
-        }
-      })
+      mockSearchParams = new URLSearchParams('lobby=url-lobby-id')
 
       render(
         <BrowserRouter>
@@ -109,16 +95,6 @@ describe('JoinLobby Component', () => {
   })
 
   describe('Form Validation', () => {
-    beforeEach(() => {
-      vi.doMock('react-router-dom', async () => {
-        const actual = await vi.importActual('react-router-dom')
-        return {
-          ...actual,
-          useNavigate: () => mockNavigate,
-          useSearchParams: () => [new URLSearchParams()],
-        }
-      })
-    })
 
     it('should disable join button when name is empty', () => {
       render(

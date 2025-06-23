@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { subscribeLobby, getCurrentUser, leaveLobby, updateLobbyStatus } from '../../services/firebase';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { subscribeLobby, getCurrentUser, leaveLobby, updateLobbyStatus, createPlaylistCollection } from '../../services/firebase';
 import { PlayerList } from './PlayerList';
 import type { Lobby as LobbyType } from '../../types/types';
 import './Lobby.css';
+import { SearchDialog } from '../SearchDialog/SearchDialog';
+import { PlaylistStats } from '../PlaylistStats/PlaylistStats';
 
 export const Lobby = () => {
   const { lobbyId } = useParams<{ lobbyId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [lobby, setLobby] = useState<LobbyType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,11 +67,20 @@ export const Lobby = () => {
     if (!lobbyId || !lobby) return;
     
     try {
+      // Create a playlist collection document
+      await createPlaylistCollection(lobbyId, `playlist_${lobbyId}`);
+      
+      // Update lobby status to start song collection
       await updateLobbyStatus(lobbyId, 'collecting_songs');
     } catch (error) {
       console.error('Error starting song collection:', error);
       setError('Failed to start song collection. Please try again.');
     }
+  };
+
+  const handleGameStart = () => {
+    // Navigate to game view (to be implemented in Phase 3)
+    navigate(`/game/${lobbyId}`);
   };
 
   const handleLeaveLobby = async () => {
@@ -231,7 +243,21 @@ export const Lobby = () => {
           <div className="collection-phase">
             <h3>Song Collection Phase</h3>
             <p>Players can now add songs to the playlist. The game will start once everyone has added their songs.</p>
-            {/* TODO: Add song collection UI in Sprint 2 */}
+            
+            {/* Search dialog for all players */}
+            <SearchDialog 
+              lobbyId={lobbyId!}
+              currentUserId={currentUserId}
+              isHost={isHost}
+            />
+            
+            {/* Playlist stats for host */}
+            {isHost && (
+              <PlaylistStats 
+                lobbyId={lobbyId!}
+                onStartGame={handleGameStart}
+              />
+            )}
           </div>
         )}
       </div>

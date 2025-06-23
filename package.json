@@ -15,9 +15,11 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.10",
+    "@types/lodash": "^4.17.18",
     "@types/react-router-dom": "^5.3.3",
     "autoprefixer": "^10.4.21",
     "firebase": "^11.9.1",
+    "lodash": "^4.17.21",
     "postcss": "^8.5.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -27,8 +29,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
-    "@testing-library/react": "^16.1.0",
     "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",

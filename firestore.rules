@@ -1,78 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Lobby rules
-    match /lobbies/{lobbyId} {
-      // Anyone authenticated can read lobbies
-      allow read: if request.auth != null;
-      
-      // Anyone authenticated can create a lobby
-      allow create: if request.auth != null
-        && request.auth.uid == resource.data.hostFirebaseUid;
-      
-      // Only players in the lobby can update it
-      allow update: if request.auth != null 
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys());
-      
-      // Only the host can delete the lobby
-      allow delete: if request.auth != null
-        && request.auth.uid == resource.data.hostFirebaseUid;
-    }
-    
-    // Playlist rules (for song collection phase)
-    match /playlists/{lobbyId} {
-      // Only players in the corresponding lobby can read
-      allow read: if request.auth != null 
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys());
-      
-      // Only the host can create the playlist document
-      allow create: if request.auth != null 
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostFirebaseUid;
-      
-      // Only players in the lobby can update (add songs)
-      allow update: if request.auth != null 
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys());
-    }
-    
-    // Song proposals (for the proposal workflow mentioned in game_setup.md)
-    match /lobbies/{lobbyId}/proposals/{trackUri} {
-      // Only players in the lobby can read proposals
-      allow read: if request.auth != null 
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys());
-      
-      // Only players in the lobby can create proposals
-      allow create: if request.auth != null 
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys())
-        && request.auth.uid == request.resource.data.proposedBy;
-      
-      // Only the host can update proposals (approve/reject)
-      allow update: if request.auth != null
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostFirebaseUid;
-      
-      // Only the host can delete proposals
-      allow delete: if request.auth != null
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostFirebaseUid;
-    }
-    
-    // Game state (when game is active)
-    match /games/{lobbyId} {
-      // Only players in the corresponding lobby can read
-      allow read: if request.auth != null 
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys());
-      
-      // Only the host can create/update game state
-      allow create, update: if request.auth != null
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostFirebaseUid;
+    // Temporarily allow all operations for authenticated users for debugging
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 } 
