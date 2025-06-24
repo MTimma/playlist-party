@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { subscribeLobby, getCurrentUser, leaveLobby, updateLobbyStatus, createPlaylistCollection } from '../../services/firebase';
+import { subscribeLobby, getCurrentUser, leaveLobby, updateLobbyStatus, createPlaylistCollection, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
 import { PlayerList } from './PlayerList';
+import { ReadyButton } from '../ReadyButton/ReadyButton';
+import { PlaylistNameDialog } from '../PlaylistNameDialog/PlaylistNameDialog';
+import { MySongs } from '../MySongs/MySongs';
 import type { Lobby as LobbyType } from '../../types/types';
 import './Lobby.css';
 import { SearchDialog } from '../SearchDialog/SearchDialog';
@@ -19,6 +22,7 @@ export const Lobby = () => {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [shareLink, setShareLink] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
   const isHost = searchParams.get('host') === 'true';
 
@@ -78,9 +82,38 @@ export const Lobby = () => {
     }
   };
 
-  const handleGameStart = () => {
-    // Navigate to game view (to be implemented in Phase 3)
-    navigate(`/game/${lobbyId}`);
+  const handleToggleReady = async () => {
+    if (!lobbyId) return;
+    
+    try {
+      await togglePlayerReady(lobbyId);
+    } catch (error) {
+      console.error('Error toggling ready status:', error);
+      setError('Failed to update ready status. Please try again.');
+    }
+  };
+
+  const handleStartGameRequest = () => {
+    setShowPlaylistDialog(true);
+  };
+
+  const handleStartGameConfirm = async (playlistName: string) => {
+    if (!lobbyId) return;
+    
+    try {
+      await startGameWithPlaylist(lobbyId, playlistName);
+      setShowPlaylistDialog(false);
+      // The Cloud Function will handle the playlist creation and status update
+      // Navigate to game view once status changes to 'in_progress'
+    } catch (error) {
+      console.error('Error starting game:', error);
+      setError('Failed to start game. Please try again.');
+      setShowPlaylistDialog(false);
+    }
+  };
+
+  const handleStartGameCancel = () => {
+    setShowPlaylistDialog(false);
   };
 
   const handleLeaveLobby = async () => {
@@ -114,6 +147,22 @@ export const Lobby = () => {
   const canStartSongCollection = () => {
     if (!lobby || !isHost) return false;
     return lobby.status === 'waiting' && Object.keys(lobby.players).length >= 2;
+  };
+
+  const getCurrentPlayer = () => {
+    if (!lobby || !currentUserId) return null;
+    return lobby.players[currentUserId];
+  };
+
+  const getAllPlayersReady = () => {
+    if (!lobby) return false;
+    const players = Object.values(lobby.players);
+    return players.length >= 2 && players.every(player => player.isReady === true);
+  };
+
+  const getReadyCount = () => {
+    if (!lobby) return 0;
+    return Object.values(lobby.players).filter(player => player.isReady === true).length;
   };
 
   if (loading) {
@@ -241,8 +290,13 @@ export const Lobby = () => {
 
         {lobby.status === 'collecting_songs' && (
           <div className="collection-phase">
-            <h3>Song Collection Phase</h3>
-            <p>Players can now add songs to the playlist. The game will start once everyone has added their songs.</p>
+            <div className="phase-header">
+              <h3>Song Collection Phase</h3>
+              <div className="readiness-summary">
+                {getReadyCount()} of {Object.keys(lobby.players).length} players ready
+              </div>
+            </div>
+            <p>Add songs to the playlist and mark yourself ready when done. The game will start once everyone is ready.</p>
             
             {/* Search dialog for all players */}
             <SearchDialog 
@@ -251,16 +305,61 @@ export const Lobby = () => {
               isHost={isHost}
             />
             
+            {/* My Songs for non-host players */}
+            {!isHost && (
+              <MySongs 
+                lobbyId={lobbyId!}
+                userId={currentUserId}
+              />
+            )}
+            
+            {/* Ready button for all players */}
+            {getCurrentPlayer() && (
+              <div className="ready-section">
+                <ReadyButton
+                  isReady={getCurrentPlayer()?.isReady || false}
+                  onToggleReady={handleToggleReady}
+                />
+                {!getCurrentPlayer()?.isReady && (
+                  <p className="ready-hint">
+                    Mark yourself ready once you've added all your songs
+                  </p>
+                )}
+              </div>
+            )}
+            
             {/* Playlist stats for host */}
             {isHost && (
               <PlaylistStats 
                 lobbyId={lobbyId!}
-                onStartGame={handleGameStart}
+                onStartGame={handleStartGameRequest}
               />
+            )}
+            
+            {/* All players ready notification */}
+            {getAllPlayersReady() && isHost && (
+              <div className="all-ready-notice">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <div>
+                  <h4>All Players Ready!</h4>
+                  <p>Everyone has marked themselves ready. You can now start the game.</p>
+                </div>
+              </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Playlist Name Dialog */}
+      <PlaylistNameDialog
+        isOpen={showPlaylistDialog}
+        lobbyId={lobbyId || ''}
+        defaultName={lobby?.playlistName}
+        onConfirm={handleStartGameConfirm}
+        onCancel={handleStartGameCancel}
+      />
     </div>
   );
 }; 

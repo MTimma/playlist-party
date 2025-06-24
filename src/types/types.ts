@@ -8,6 +8,7 @@ export interface Player {
   score: number;
   avatarUrl?: string;
   hasAddedSongs?: boolean;
+  isReady?: boolean;  // NEW - Player readiness for game start
 }
 
 export interface Track {
@@ -27,8 +28,10 @@ export interface Lobby {
   hostFirebaseUid: string;
   hostSpotifyUserId: string;
   playlistId?: string;
+  playlistName?: string;  // NEW - Custom playlist name
   status: 'waiting' | 'collecting_songs' | 'in_progress' | 'finished';
   createdAt: Date | Timestamp;
+  startedAt?: Date | Timestamp;  // NEW - When game actually begins
   maxPlayers: number;
   currentRound?: number;
   players: {

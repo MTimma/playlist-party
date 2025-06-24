@@ -219,20 +219,80 @@
   border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 12px;
   padding: 2rem;
-  text-align: center;
+  margin-top: 2rem;
+}
+
+.phase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
 }
 
 .collection-phase h3 {
   color: white;
   font-size: 1.5rem;
   font-weight: 600;
-  margin: 0 0 1rem 0;
+  margin: 0;
+}
+
+.readiness-summary {
+  background: rgba(29, 185, 84, 0.1);
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  color: #1DB954;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .collection-phase p {
   color: rgba(255, 255, 255, 0.8);
-  margin: 0;
+  margin: 0 0 1.5rem 0;
   line-height: 1.5;
+}
+
+.ready-section {
+  margin: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.ready-hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.all-ready-notice {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+  color: #22c55e;
+}
+
+.all-ready-notice h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.all-ready-notice p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: rgba(34, 197, 94, 0.8);
 }
 
 .lobby-loading,

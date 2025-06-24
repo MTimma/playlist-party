@@ -17,13 +17,17 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
     // Handle both Date objects and Firestore Timestamps
     let joinTime: Date;
     
-    if (joinedAt instanceof Timestamp) {
+    if (joinedAt && typeof joinedAt === 'object' && 'toDate' in joinedAt) {
+      // Firestore Timestamp
       joinTime = joinedAt.toDate();
     } else if (joinedAt instanceof Date) {
       joinTime = joinedAt;
-    } else {
-      // Handle string dates or other formats
+    } else if (typeof joinedAt === 'string' || typeof joinedAt === 'number') {
+      // Handle string dates or timestamps
       joinTime = new Date(joinedAt);
+    } else {
+      // Fallback for unknown formats
+      return 'Just joined';
     }
     
     // Validate that we have a valid date
@@ -111,7 +115,19 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
             </div>
 
             <div className="player-status">
-              <div className="status-indicator online" data-testid="status-indicator"></div>
+              {player.isReady ? (
+                <div className="ready-indicator" title="Ready">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                </div>
+              ) : (
+                <div className="not-ready-indicator" title="Not ready">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
         ))}

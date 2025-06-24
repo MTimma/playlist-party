@@ -181,6 +181,21 @@
   flex-shrink: 0;
 }
 
+.ready-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10b981;
+}
+
+.not-ready-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+}
+
+/* Legacy support */
 .status-indicator {
   width: 8px;
   height: 8px;

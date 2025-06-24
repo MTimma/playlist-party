@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { debounce } from 'lodash';
-import { addTrackProposal, subscribeTrackProposals } from '../../services/firebase';
+import { addTrackProposal, addTrackToPlaylist, subscribeTrackProposals } from '../../services/firebase';
 import type { Track, TrackProposal } from '../../types/types';
 import './SearchDialog.css';
 
@@ -93,8 +93,8 @@ export const SearchDialog = ({ lobbyId, currentUserId, isHost }: SearchDialogPro
         trackUri: track.uri,
         trackName: track.name
       });
-      
-      await addTrackProposal(lobbyId, currentUserId, track);
+      await addTrackToPlaylist(lobbyId, track.uri, currentUserId, track);
+      // await addTrackProposal(lobbyId, currentUserId, track);
       
       // Update search results to show this track as added
       setSearchResults(prev => 

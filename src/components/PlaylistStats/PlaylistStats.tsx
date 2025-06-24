@@ -45,6 +45,10 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
     return playlistData.stats.totalSongs >= 2 && playlistData.stats.playersWithSongs >= 2;
   };
 
+    // const canStartGame = () => {
+    //  return true;
+    // };
+
   if (!playlistData) {
     return (
       <div className="playlist-stats">

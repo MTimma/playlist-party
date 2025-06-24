@@ -36,12 +36,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services with emulator support
-let db: ReturnType<typeof getFirestore>;
-let auth: ReturnType<typeof getAuth>;
-
-// Initialize services first
-db = getFirestore(app);
-auth = getAuth(app);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Connect to emulators in development mode
 if (import.meta.env.DEV && !import.meta.env.VITE_USE_FIREBASE_PROD) {
@@ -216,6 +212,65 @@ export const leaveLobby = async (lobbyId: string) => {
   });
 };
 
+export const togglePlayerReady = async (lobbyId: string): Promise<void> => {
+  const user = getCurrentUser();
+  if (!user) throw new Error('User not authenticated');
+  
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbyDoc = await getDoc(lobbyRef);
+  
+  if (!lobbyDoc.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobby = lobbyDoc.data() as Lobby;
+  const player = lobby.players[user.uid];
+  
+  if (!player) {
+    throw new Error('Player not found in lobby');
+  }
+  
+  const newReadyStatus = !player.isReady;
+  
+  await updateDoc(lobbyRef, {
+    [`players.${user.uid}.isReady`]: newReadyStatus
+  });
+};
+
+export const startGameWithPlaylist = async (lobbyId: string, playlistName: string): Promise<void> => {
+  const user = getCurrentUser();
+  if (!user) throw new Error('User not authenticated');
+  
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbyDoc = await getDoc(lobbyRef);
+  
+  if (!lobbyDoc.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobby = lobbyDoc.data() as Lobby;
+  
+  // Verify user is host
+  if (lobby.hostFirebaseUid !== user.uid) {
+    throw new Error('Only the host can start the game');
+  }
+  
+  // Verify all players are ready
+  const players = Object.values(lobby.players);
+  const allReady = players.every(player => player.isReady === true);
+  
+  if (!allReady) {
+    throw new Error('All players must be ready before starting the game');
+  }
+  
+  // Update lobby status and trigger Cloud Function
+  await updateDoc(lobbyRef, {
+    status: 'in_progress',
+    playlistName: playlistName,
+    startedAt: new Date()
+  });
+};
+
 // Legacy functions for backward compatibility
 export const createGame = async (host: Player): Promise<string> => {
   const gameRef = doc(collection(db, 'games'));
@@ -345,7 +400,7 @@ export const updateTrackProposalStatus = async (
   const encodedTrackUri = encodeURIComponent(trackUri);
   const proposalRef = doc(db, 'lobbies', lobbyId, 'proposals', encodedTrackUri);
   
-  const updateData: any = { status };
+  const updateData: Partial<TrackProposal> = { status };
   if (reason) {
     updateData.reason = reason;
   }
@@ -382,6 +437,56 @@ export const createPlaylistCollection = async (
   await setDoc(collectionRef, collection);
 };
 
+// Get count of players who have added songs
+export const getPlayersWithSongsCount = async (lobbyId: string): Promise<number> => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbyDoc = await getDoc(lobbyRef);
+  
+  if (!lobbyDoc.exists()) {
+    return 0;
+  }
+  
+  const lobby = lobbyDoc.data() as Lobby;
+  const playersWithSongs = Object.values(lobby.players || {}).filter(
+    player => player.hasAddedSongs === true
+  ).length;
+  
+  return playersWithSongs;
+};
+
+// Update stats when a player adds their first song
+export const updatePlaylistStats = async (lobbyId: string, addedBy: string): Promise<void> => {
+  // First, check if this is the player's first song
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbyDoc = await getDoc(lobbyRef);
+  
+  if (!lobbyDoc.exists()) {
+    return;
+  }
+  
+  const lobby = lobbyDoc.data() as Lobby;
+  const player = lobby.players[addedBy];
+  const isFirstSong = !player?.hasAddedSongs;
+  
+  // Update player status
+  await updateDoc(lobbyRef, {
+    [`players.${addedBy}.hasAddedSongs`]: true
+  });
+  
+  // Update playlist stats
+  const collectionRef = doc(db, 'playlists', lobbyId);
+  const updateData: Record<string, any> = {
+    'stats.totalSongs': increment(1)
+  };
+  
+  // Only increment playersWithSongs if this is their first song
+  if (isFirstSong) {
+    updateData['stats.playersWithSongs'] = increment(1);
+  }
+  
+  await updateDoc(collectionRef, updateData);
+};
+
 export const addTrackToPlaylist = async (
   lobbyId: string, 
   trackUri: string, 
@@ -395,15 +500,11 @@ export const addTrackToPlaylist = async (
       addedBy,
       trackInfo,
       addedAt: serverTimestamp()
-    },
-    'stats.totalSongs': increment(1)
+    }
   });
   
-  // Update player's hasAddedSongs status
-  const lobbyRef = doc(db, 'lobbies', lobbyId);
-  await updateDoc(lobbyRef, {
-    [`players.${addedBy}.hasAddedSongs`]: true
-  });
+  // Update stats atomically
+  await updatePlaylistStats(lobbyId, addedBy);
 };
 
 export const subscribePlaylistCollection = (
@@ -420,7 +521,7 @@ export const subscribePlaylistCollection = (
       const collection: PlaylistCollection = {
         ...data,
         songs: Object.fromEntries(
-          Object.entries(data.songs || {}).map(([uri, songData]: [string, any]) => [
+          Object.entries(data.songs || {}).map(([uri, songData]: [string, unknown]) => [
             uri,
             {
               ...songData,

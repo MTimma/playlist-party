@@ -635,78 +635,83 @@ This approach gives guests the full "search & pick" experience while keeping the
 
 ## 🔄 Phase 3 - Cloud Function (TODO)
 
-**Required for full proposal processing:**
+### 2025-06-24 Scope Update – Player Readiness & Playlist Naming
 
+**Additional Functional Requirements**
+1. Anonymous players can view **only the tracks they have proposed** in a dedicated "My Songs" list inside the lobby.
+2. Each player now has a **"Ready" toggle** (`isReady: boolean`) stored at `lobbies/{lobbyId}/players/{playerId}`.  
+    • Players can update **only their own** `isReady` flag.  
+3. The host sees a real-time readiness indicator per player and a "Start Game" button that becomes enabled when:  
+    - Every player's `isReady` is `true`.  
+    - All minimum playlist criteria (≥ 2 songs from ≥ 2 players) are satisfied.  
+4. Before starting, the host can optionally enter a **custom playlist name** (default: "Music Game - Lobby {lobbyId}").  
+5. When the host clicks "Start Game":  
+    1. A new Cloud Function **`onStartGame`** is triggered (see below).  
+    2. The function creates a **private Spotify playlist** under the host's account using the supplied name.  
+    3. All **proposed** track URIs are batch-added to the playlist in their submitted order.  
+    4. The function writes `playlistId`, `snapshotId`, and `startedAt` to `/playlists/{lobbyId}` and sets `lobbies/{lobbyId}.status` → `in_progress`.  
+
+**Data Model Updates**
 ```typescript
-// Cloud Function: onProposalCreated
-export const onProposalCreated = functions.firestore
-  .document('lobbies/{lobbyId}/proposals/{trackUri}')
-  .onCreate(async (snapshot, context) => {
-    const { lobbyId, trackUri } = context.params;
-    const proposal = snapshot.data() as TrackProposal;
+interface Player {
+  id: string;
+  name: string;
+  isHost: boolean;
+  score: number;
+  hasAddedSongs: boolean;
+  isReady: boolean;      // NEW
+}
+
+interface Lobby {
+  // ...existing fields...
+  status: 'waiting' | 'collecting_songs' | 'in_progress' | 'finished';
+  startedAt?: Timestamp;  // NEW – when game actually begins
+}
+```
+
+**Firestore Rules Additions**
+```javascript
+match /lobbies/{lobbyId}/players/{playerId} {
+  allow update: if request.auth != null
+    && playerId == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isReady']);
+}
+
+match /lobbies/{lobbyId} {
+  // Host can transition status → 'in_progress' only if all players ready
+  allow update: if request.auth != null
+    && request.auth.uid == resource.data.hostId
+    && request.resource.data.status == 'in_progress';
+}
+```
+
+**Cloud Function: `onStartGame` (outline)**
+```typescript
+export const onStartGame = functions.firestore
+  .document('lobbies/{lobbyId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() as Lobby;
+    const after  = change.after.data()  as Lobby;
+    if (before.status !== 'collecting_songs' || after.status !== 'in_progress') return;
     
-    try {
-      // 1. Get host's refresh token from lobby
-      const lobby = await admin.firestore().doc(`lobbies/${lobbyId}`).get();
-      const hostRefreshToken = lobby.data()?.hostRefreshToken;
-      
-      // 2. Exchange refresh token for access token
-      const accessToken = await exchangeRefreshToken(hostRefreshToken);
-      
-      // 3. Get playlist ID from playlist collection
-      const playlistDoc = await admin.firestore().doc(`playlists/${lobbyId}`).get();
-      const playlistId = playlistDoc.data()?.playlistId;
-      
-      // 4. Add track to Spotify playlist
-      await axios.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-        uris: [trackUri]
-      }, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      
-      // 5. Update proposal status and playlist metadata
-      await Promise.all([
-        // Mark proposal as approved
-        snapshot.ref.update({ status: 'approved' }),
-        
-        // Add to playlist collection
-        admin.firestore().doc(`playlists/${lobbyId}`).update({
-          [`songs.${trackUri}`]: {
-            addedBy: proposal.proposedBy,
-            trackInfo: proposal.trackInfo,
-            addedAt: admin.firestore.FieldValue.serverTimestamp()
-          },
-          'stats.totalSongs': admin.firestore.FieldValue.increment(1)
-        }),
-        
-        // Update player status
-        admin.firestore().doc(`lobbies/${lobbyId}`).update({
-          [`players.${proposal.proposedBy}.hasAddedSongs`]: true
-        })
-      ]);
-      
-    } catch (error) {
-      // Mark proposal as rejected with reason
-      await snapshot.ref.update({ 
-        status: 'rejected', 
-        reason: error.message 
-      });
-    }
+    // Implementation steps:
+    // 1. Validate all players .isReady === true
+    // 2. Exchange host refresh token → access token
+    // 3. POST /v1/users/{hostSpotifyUserId}/playlists name = after.playlistName
+    // 4. Batch add all proposed songs (max 100 per request)
+    // 5. Write playlistId, snapshotId, startedAt
   });
 ```
 
-**Deployment Command:**
-```bash
-firebase deploy --only functions:onProposalCreated
-```
+**Sprint Tasks Added**
+• **4.5** "My Songs" sub-component in `SearchDialog` showing own proposals  
+• **4.6** `ReadyButton` component; update `PlayerList` to display readiness state  
+• **4.7** Host-side `PlaylistNameDialog` with validation (1-100 chars)  
+• **5.5** Implement `onStartGame` Cloud Function & Firestore rules tests  
+• **5.6** End-to-end test: all players ready → host start → playlist appears within 3 s
 
-**Environment Variables Needed:**
-- `SPOTIFY_CLIENT_ID`
-- `SPOTIFY_CLIENT_SECRET`
-
-**Testing:**
-- Unit tests with Firebase emulator
-- Integration test: guest proposes track → appears in host's playlist within 2s
+> **Deprecated Workflow** – _Song approval & instant playlist sync were removed on 2025-06-24._  
+> The `onProposalCreated` function is no longer required and will be deleted in a future clean-up PR.
 
 ## 📋 Current Status
 
