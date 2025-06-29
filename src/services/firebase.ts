@@ -198,6 +198,9 @@ export const subscribeLobby = (lobbyId: string, callback: (lobby: Lobby | null) 
 };
 
 export const updateLobbyStatus = async (lobbyId: string, status: Lobby['status']) => {
+  // Ensure user is authenticated
+  await signInAnonymouslyIfNeeded();
+  
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   await updateDoc(lobbyRef, { status });
 };
@@ -262,12 +265,66 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
   if (!allReady) {
     throw new Error('All players must be ready before starting the game');
   }
+
+  // Get all songs from the playlist collection
+  const playlistRef = doc(db, 'playlists', lobbyId);
+  const playlistDoc = await getDoc(playlistRef);
+
+  if (!playlistDoc.exists()) {
+    throw new Error('Playlist collection not found');
+  }
+
+  const playlistData = playlistDoc.data() as PlaylistCollection;
+  const trackUris: string[] = Object.keys(playlistData.songs || {});
+
+  if (trackUris.length === 0) {
+    throw new Error('No tracks have been added to the playlist');
+  }
+
+  // Create playlist via Express server
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  if (!backendUrl) {
+    throw new Error('Server not configured');
+  }
   
-  // Update lobby status and trigger Cloud Function
+  const response = await fetch(`${backendUrl}/api/spotify/playlist`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include', // Include cookies for authentication
+    body: JSON.stringify({
+      name: playlistName,
+      description: `Playlist created for Music Game lobby ${lobbyId} with ${players.length} players`,
+      trackUris: trackUris
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create playlist');
+  }
+
+  const result = await response.json();
+
+  // Update lobby with playlist information and status
   await updateDoc(lobbyRef, {
     status: 'in_progress',
     playlistName: playlistName,
+    playlistId: result.playlist.id,
+    snapshotId: result.playlist.snapshot_id,
     startedAt: new Date()
+  });
+
+
+  // Create playlist collection document for tracking
+  await setDoc(doc(db, 'playlists', lobbyId), {
+    lobbyId,
+    playlistId: result.playlist.id,
+    snapshotId: result.playlist.snapshot_id,
+    createdAt: new Date(),
+    trackCount: trackUris.length,
+    playerCount: players.length,
   });
 };
 
@@ -422,6 +479,9 @@ export const createPlaylistCollection = async (
   lobbyId: string, 
   playlistId: string
 ): Promise<void> => {
+  // Ensure user is authenticated
+  await signInAnonymouslyIfNeeded();
+  
   const collectionRef = doc(db, 'playlists', lobbyId);
   
   const collection: PlaylistCollection = {
@@ -456,6 +516,7 @@ export const getPlayersWithSongsCount = async (lobbyId: string): Promise<number>
 
 // Update stats when a player adds their first song
 export const updatePlaylistStats = async (lobbyId: string, addedBy: string): Promise<void> => {
+  
   // First, check if this is the player's first song
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   const lobbyDoc = await getDoc(lobbyRef);
@@ -521,7 +582,7 @@ export const subscribePlaylistCollection = (
       const collection: PlaylistCollection = {
         ...data,
         songs: Object.fromEntries(
-          Object.entries(data.songs || {}).map(([uri, songData]: [string, unknown]) => [
+          Object.entries(data.songs || {}).map(([uri, songData]: [string, any]) => [
             uri,
             {
               ...songData,

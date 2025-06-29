@@ -10,12 +10,20 @@ service cloud.firestore {
       // Anyone authenticated can create a lobby
       allow create: if request.auth != null;
       
-      // Players can update their own ready status, host can update lobby status
+      // Players can update their own ready status, join lobby, or host can update lobby status
       allow update: if request.auth != null && (
+        // Player updating their own added songs status
+        (request.auth.uid in resource.data.players.keys() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players']) &&
+         request.resource.data.players[request.auth.uid].diff(resource.data.players[request.auth.uid]).affectedKeys().hasOnly(['hasAddedSongs'])) ||
         // Player updating their own ready status
         (request.auth.uid in resource.data.players.keys() &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players']) &&
          request.resource.data.players[request.auth.uid].diff(resource.data.players[request.auth.uid]).affectedKeys().hasOnly(['isReady'])) ||
+        // New player joining the lobby (adding themselves to players)
+        (!(request.auth.uid in resource.data.players.keys()) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players']) &&
+         request.auth.uid in request.resource.data.players.keys()) ||
         // Host updating lobby (status changes, playlist info)
         (request.auth.uid == resource.data.hostFirebaseUid)
       );

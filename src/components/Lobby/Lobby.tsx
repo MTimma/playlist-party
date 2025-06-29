@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { subscribeLobby, getCurrentUser, leaveLobby, updateLobbyStatus, createPlaylistCollection, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { subscribeLobby, signInAnonymouslyIfNeeded, leaveLobby, updateLobbyStatus, createPlaylistCollection, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
 import { PlayerList } from './PlayerList';
 import { ReadyButton } from '../ReadyButton/ReadyButton';
 import { PlaylistNameDialog } from '../PlaylistNameDialog/PlaylistNameDialog';
@@ -14,7 +14,6 @@ export const Lobby = () => {
   const { lobbyId } = useParams<{ lobbyId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const location = useLocation();
   
   const [lobby, setLobby] = useState<LobbyType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,28 +31,44 @@ export const Lobby = () => {
       return;
     }
 
-    // Get current user
-    const user = getCurrentUser();
-    if (user) {
-      setCurrentUserId(user.uid);
-    }
+    const initializeLobby = async () => {
+      try {
+        // Ensure user is authenticated (sign in anonymously if needed)
+        const user = await signInAnonymouslyIfNeeded();
+        setCurrentUserId(user.uid);
 
-    // Generate share link
-    setShareLink(`${window.location.origin}/join?lobby=${lobbyId}`);
+        // Generate share link
+        setShareLink(`${window.location.origin}/join?lobby=${lobbyId}`);
 
-    // Subscribe to lobby updates
-    const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
-      if (lobbyData) {
-        setLobby(lobbyData);
-        setError('');
-      } else {
-        setError('Lobby not found');
+        // Subscribe to lobby updates
+        const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
+          if (lobbyData) {
+            setLobby(lobbyData);
+            setError('');
+          } else {
+            setError('Lobby not found');
+          }
+          setLoading(false);
+        });
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error initializing lobby:', error);
+        setError('Failed to join lobby. Please try again.');
+        setLoading(false);
       }
-      setLoading(false);
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    
+    initializeLobby().then((unsub) => {
+      unsubscribe = unsub;
     });
 
     return () => {
-      unsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [lobbyId, navigate]);
 

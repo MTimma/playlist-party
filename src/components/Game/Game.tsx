@@ -116,7 +116,7 @@ export const Game = () => {
           ))}
         </div>
         {isHost && (
-          <button className="lobby-button mt-8" onClick={handleStartGame} disabled={gameState.players.length < 2}>
+          <button className="lobby-button mt-8" onClick={handleStartGame} disabled={!canStartGame()}>
             Start Game
           </button>
         )}
@@ -175,4 +175,9 @@ export const Game = () => {
       </div>
     </div>
   );
+
+  function canStartGame(): boolean {
+    if(!gameState?.players) return false;
+    return gameState.players.length >=2 && gameState.players.every(player => player.isReady === true);
+  }
 }; 
