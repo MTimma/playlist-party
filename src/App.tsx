@@ -16,7 +16,7 @@ function App() {
           <Route path="/create" element={<CreateLobby />} />
           <Route path="/join" element={<JoinLobby />} />
           <Route path="/lobby/:lobbyId" element={<Lobby />} />
-          <Route path="/game/:gameId" element={<Game />} />
+          <Route path="/game/:lobbyId" element={<Game />} />
           <Route path="/callback" element={<SpotifyCallback />} />
         </Routes>
       </Router>

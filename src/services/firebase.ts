@@ -21,7 +21,8 @@ import {
   type User,
   connectAuthEmulator
 } from 'firebase/auth';
-import type { Lobby, Player, GameState, Song, Track, TrackProposal, PlaylistCollection } from '../types/types';
+import { useState, useEffect } from 'react';
+import type { Lobby, Player, GameState, LegacyGameState, Song, Track, TrackProposal, PlaylistCollection, Guess, PlayerScore } from '../types/types';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -316,6 +317,8 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
     startedAt: new Date()
   });
 
+  // Create initial game state
+  await createInitialGameState(lobbyId, trackUris, playlistData.songs);
 
   // Create playlist collection document for tracking
   await setDoc(doc(db, 'playlists', lobbyId), {
@@ -328,12 +331,48 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
   });
 };
 
+// Create initial game state when game starts
+export const createInitialGameState = async (
+  lobbyId: string, 
+  trackUris: string[], 
+  songs: PlaylistCollection['songs']
+): Promise<void> => {
+  if (trackUris.length === 0) {
+    throw new Error('No tracks available for game');
+  }
+
+  // Get the first track and its owner
+  const firstTrackUri = trackUris[0];
+  const firstSongData = songs[firstTrackUri];
+  
+  if (!firstSongData) {
+    throw new Error('First track data not found');
+  }
+
+  const initialGameState: Omit<GameState, 'startedAt'> = {
+    lobbyId,
+    currentTrackUri: firstTrackUri,
+    currentRound: 1,
+    trackOwnerId: firstSongData.addedBy,
+    isPlaying: false,
+    progressMs: 0,
+    guessWindowMs: 30000, // 30 seconds
+    disableGuessing: false
+  };
+
+  const gameStateRef = doc(db, 'games', lobbyId, 'state', 'current');
+  await setDoc(gameStateRef, {
+    ...initialGameState,
+    startedAt: serverTimestamp()
+  });
+};
+
 // Legacy functions for backward compatibility
 export const createGame = async (host: Player): Promise<string> => {
   const gameRef = doc(collection(db, 'games'));
   const gameId = gameRef.id;
   
-  const gameState: GameState = {
+  const gameState: LegacyGameState = {
     id: gameId,
     host,
     players: [host],
@@ -353,7 +392,7 @@ export const joinGame = async (gameId: string, player: Player) => {
   const gameDoc = await getDoc(gameRef);
   
   if (gameDoc.exists()) {
-    const game = gameDoc.data() as GameState;
+    const game = gameDoc.data() as LegacyGameState;
     if (game.status === 'waiting') {
       const updatedPlayers = [...game.players, player];
       await updateDoc(gameRef, { players: updatedPlayers });
@@ -366,7 +405,7 @@ export const addSong = async (gameId: string, song: Song) => {
   const gameDoc = await getDoc(gameRef);
   
   if (gameDoc.exists()) {
-    const game = gameDoc.data() as GameState;
+    const game = gameDoc.data() as LegacyGameState;
     const updatedPlaylist = [...game.playlist, song];
     await updateDoc(gameRef, { playlist: updatedPlaylist });
   }
@@ -536,16 +575,17 @@ export const updatePlaylistStats = async (lobbyId: string, addedBy: string): Pro
   
   // Update playlist stats
   const collectionRef = doc(db, 'playlists', lobbyId);
-  const updateData: Record<string, any> = {
-    'stats.totalSongs': increment(1)
-  };
   
-  // Only increment playersWithSongs if this is their first song
   if (isFirstSong) {
-    updateData['stats.playersWithSongs'] = increment(1);
+    await updateDoc(collectionRef, {
+      'stats.totalSongs': increment(1),
+      'stats.playersWithSongs': increment(1)
+    });
+  } else {
+    await updateDoc(collectionRef, {
+      'stats.totalSongs': increment(1)
+    });
   }
-  
-  await updateDoc(collectionRef, updateData);
 };
 
 export const addTrackToPlaylist = async (
@@ -582,11 +622,13 @@ export const subscribePlaylistCollection = (
       const collection: PlaylistCollection = {
         ...data,
         songs: Object.fromEntries(
-          Object.entries(data.songs || {}).map(([uri, songData]: [string, any]) => [
+          Object.entries(data.songs || {}).map(([uri, songData]: [string, unknown]) => [
             uri,
             {
-              ...songData,
-              addedAt: songData.addedAt?.toDate() || new Date()
+              ...songData as Record<string, unknown>,
+              addedAt: (songData as Record<string, unknown>).addedAt && typeof (songData as Record<string, unknown>).addedAt === 'object' && 'toDate' in (songData as Record<string, unknown>).addedAt 
+                ? (songData as Record<string, unknown>).addedAt.toDate() 
+                : new Date()
             }
           ])
         )
@@ -597,4 +639,106 @@ export const subscribePlaylistCollection = (
       callback(null);
     }
   });
+};
+
+export const subscribeGameState = (
+  lobbyId: string, 
+  callback: (gameState: GameState | null) => void
+) => {
+  const gameStateRef = doc(db, 'games', lobbyId, 'state', 'current');
+  
+  return onSnapshot(gameStateRef, (doc) => {
+    if (doc.exists()) {
+      const data = doc.data();
+      const gameState: GameState = {
+        ...data,
+        startedAt: data.startedAt?.toDate() || new Date()
+      } as GameState;
+      callback(gameState);
+    } else {
+      callback(null);
+    }
+  });
+};
+
+export const getTrackInfo = async (/* trackUri: string */): Promise<Track | null> => {
+  // TODO: Implement Spotify API call to get track info
+  return null;
+};
+
+export const getTrackOwner = async (lobbyId: string, trackUri: string): Promise<string | null> => {
+  const collectionRef = doc(db, 'playlists', lobbyId);
+  const collectionDoc = await getDoc(collectionRef);
+  
+  if (!collectionDoc.exists()) {
+    return null;
+  }
+  
+  const collection = collectionDoc.data() as PlaylistCollection;
+  const songData = collection.songs[trackUri];
+  
+  return songData?.addedBy || null;
+};
+
+export const createGuess = async (
+  lobbyId: string,
+  playerId: string,
+  trackUri: string,
+  guessedOwnerId: string
+): Promise<void> => {
+  const guessRef = doc(collection(db, 'games', lobbyId, 'guesses'));
+  
+  const guess: Guess = {
+    id: guessRef.id,
+    playerId,
+    trackUri,
+    guessedOwnerId,
+    createdAt: serverTimestamp() as unknown as Date,
+    isCorrect: false // Will be set by Cloud Function
+  };
+
+  await setDoc(guessRef, {
+    ...guess,
+    createdAt: serverTimestamp()
+  });
+};
+
+export const subscribePlayerScores = (
+  lobbyId: string,
+  callback: (scores: PlayerScore[]) => void
+) => {
+  const scoresRef = collection(db, 'games', lobbyId, 'scores');
+  
+  return onSnapshot(scoresRef, (snapshot) => {
+    const scores: PlayerScore[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      scores.push({
+        playerId: data.playerId,
+        score: data.score
+      } as PlayerScore);
+    });
+    callback(scores);
+  });
+};
+
+export const useGameState = (lobbyId: string) => {
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!lobbyId) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = subscribeGameState(lobbyId, (state) => {
+      setGameState(state);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [lobbyId]);
+
+  return { gameState, loading };
 }; 

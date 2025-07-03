@@ -1,183 +1,160 @@
 import { useEffect, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
-import { subscribeToGame, updateGameState, joinGame } from '../../services/firebase';
-import { playSong, pauseSong } from '../../services/spotify';
-import type { GameState, Player } from '../../types/types';
+import { useParams } from 'react-router-dom';
+import { 
+  subscribeGameState, 
+  subscribePlaylistCollection, 
+  subscribeLobby 
+} from '../../services/firebase';
+import { TrackInfo } from '../TrackInfo/TrackInfo';
+import type { GameState, Track, PlaylistCollection, Lobby } from '../../types/types';
 import './Game.css';
 
 export const Game = () => {
-  const { gameId } = useParams<{ gameId: string }>();
-  const location = useLocation();
+  const { lobbyId } = useParams<{ lobbyId: string }>();
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playerName, setPlayerName] = useState('');
-  const [joining, setJoining] = useState(false);
-  const [playerId, setPlayerId] = useState<string | null>(null);
-  const isHost = location.search.includes('host=1');
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [lobby, setLobby] = useState<Lobby | null>(null);
+  const [playlistCollection, setPlaylistCollection] = useState<PlaylistCollection | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Subscribe to lobby status to determine if game should be active
   useEffect(() => {
-    if (!gameId) return;
-    const unsubscribe = subscribeToGame(gameId, (game) => {
-      setGameState(game);
-    });
-    return () => unsubscribe();
-  }, [gameId]);
-
-  // Store playerId in localStorage for session persistence
-  useEffect(() => {
-    const storedId = localStorage.getItem(`playerId_${gameId}`);
-    if (storedId) setPlayerId(storedId);
-  }, [gameId]);
-
-  const handleJoin = async () => {
-    if (!playerName.trim() || !gameId) return;
-    setJoining(true);
-    const newPlayer: Player = {
-      id: crypto.randomUUID(),
-      name: playerName,
-      isHost: false,
-      score: 0
-    };
-    await joinGame(gameId, newPlayer);
-    setPlayerId(newPlayer.id);
-    localStorage.setItem(`playerId_${gameId}`, newPlayer.id);
-    setJoining(false);
-  };
-
-  const handleStartGame = async () => {
-    if (!gameId) return;
-    await updateGameState(gameId, { status: 'playing', round: 1, currentSong: gameState?.playlist[0] || null });
-  };
-
-  const handlePlaySong = async () => {
-    if (!gameState?.currentSong) return;
-    await playSong(gameState.currentSong.uri);
-    setIsPlaying(true);
-  };
-
-  const handlePauseSong = async () => {
-    await pauseSong();
-    setIsPlaying(false);
-  };
-
-  const handleGuess = async (guessPlayerId: string) => {
-    if (!gameState || !gameState.currentSong) return;
-    const isCorrect = guessPlayerId === gameState.currentSong.addedBy;
-    const updatedPlayers = gameState.players.map(player => {
-      if (player.id === guessPlayerId && isCorrect) {
-        return { ...player, score: player.score + 1 };
+    if (!lobbyId) return;
+    
+    const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
+      setLobby(lobbyData);
+      if (lobbyData && lobbyData.status !== 'in_progress') {
+        setLoading(false);
       }
-      return player;
     });
-    await updateGameState(gameId!, {
-      players: updatedPlayers,
-      round: gameState.round + 1,
-      currentSong: gameState.playlist[gameState.round] || null
+    
+    return () => unsubscribe();
+  }, [lobbyId]);
+
+  // Subscribe to game state when lobby is in progress
+  useEffect(() => {
+    if (!lobbyId || !lobby || lobby.status !== 'in_progress') return;
+    
+    const unsubscribe = subscribeGameState(lobbyId, (state) => {
+      setGameState(state);
+      setLoading(false);
     });
-    setSelectedPlayer(null);
-    setIsPlaying(false);
-  };
+    
+    return () => unsubscribe();
+  }, [lobbyId, lobby]);
 
-  if (!gameState) {
-    return <div className="loading">Loading game...</div>;
-  }
+  // Subscribe to playlist collection to get track info
+  useEffect(() => {
+    if (!lobbyId) return;
+    
+    const unsubscribe = subscribePlaylistCollection(lobbyId, (collection) => {
+      setPlaylistCollection(collection);
+    });
+    
+    return () => unsubscribe();
+  }, [lobbyId]);
 
-  // Waiting room logic
-  if (gameState.status === 'waiting') {
-    // If not host and not joined, show join form
-    if (!isHost && !playerId) {
-      return (
-        <div className="game-container">
-          <h2>Join Game</h2>
-          <input
-            type="text"
-            value={playerName}
-            onChange={e => setPlayerName(e.target.value)}
-            placeholder="Enter your name"
-            className="lobby-input"
-            disabled={joining}
-          />
-          <button onClick={handleJoin} className="lobby-button" disabled={joining || !playerName.trim()}>
-            {joining ? 'Joining...' : 'Join Game'}
-          </button>
-        </div>
-      );
+  // Get current track info when game state changes
+  useEffect(() => {
+    if (!gameState || !playlistCollection) {
+      setCurrentTrack(null);
+      return;
     }
-    // Waiting room for all
+
+    const trackUri = gameState.currentTrackUri;
+    if (!trackUri) {
+      setCurrentTrack(null);
+      return;
+    }
+
+    // Get track from playlist collection
+    const songData = playlistCollection.songs[trackUri];
+    if (songData) {
+      setCurrentTrack(songData.trackInfo);
+    } else {
+      setCurrentTrack(null);
+      setError('Track not found in playlist');
+    }
+  }, [gameState, playlistCollection]);
+
+  // Handle loading state
+  if (loading) {
     return (
       <div className="game-container">
-        <h2>Waiting for players...</h2>
-        <div className="player-scores">
-          {gameState.players.map(player => (
-            <div key={player.id} className="player-score">
-              <span>{player.name}</span>
-            </div>
-          ))}
+        <div className="loading">
+          <div className="loading-spinner"></div>
+          <p>Loading game...</p>
         </div>
-        {isHost && (
-          <button className="lobby-button mt-8" onClick={handleStartGame} disabled={!canStartGame()}>
-            Start Game
-          </button>
-        )}
       </div>
     );
   }
 
-  // Game in progress
+  // Handle error state
+  if (error) {
+    return (
+      <div className="game-container">
+        <div className="error">
+          <h2>Error</h2>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle lobby not in progress
+  if (!lobby || lobby.status !== 'in_progress') {
+    return (
+      <div className="game-container">
+        <div className="waiting">
+          <h2>Game Not Started</h2>
+          <p>The game hasn't started yet. Please wait for the host to begin.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle no game state
+  if (!gameState) {
+    return (
+      <div className="game-container">
+        <div className="waiting">
+          <h2>Waiting for Game State</h2>
+          <p>Setting up the game...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate progress start time for live updates
+  const progressStartTime = gameState.startedAt instanceof Date 
+    ? gameState.startedAt 
+    : gameState.startedAt.toDate();
+
   return (
     <div className="game-container">
       <div className="game-header">
-        <h1>Round {gameState.round} of {gameState.maxRounds}</h1>
-        <div className="player-scores">
-          {gameState.players.map(player => (
-            <div key={player.id} className="player-score">
-              <span>{player.name}</span>
-              <span>{player.score}</span>
-            </div>
-          ))}
+        <h1>Music Guessing Game</h1>
+        <div className="round-info">
+          <span>Round {gameState.currentRound}</span>
         </div>
       </div>
+
       <div className="game-content">
-        {gameState.currentSong && (
-          <div className="current-song">
-            <h2>Now Playing</h2>
-            <p>{gameState.currentSong.name}</p>
-            <p>{gameState.currentSong.artist}</p>
-            <div className="song-controls">
-              {!isPlaying ? (
-                <button onClick={handlePlaySong} className="play-button">
-                  Play
-                </button>
-              ) : (
-                <button onClick={handlePauseSong} className="pause-button">
-                  Pause
-                </button>
-              )}
-            </div>
+        <TrackInfo 
+          track={currentTrack}
+          progressMs={gameState.progressMs}
+          isPlaying={gameState.isPlaying}
+          startedAt={progressStartTime}
+        />
+        
+        {/* Phase 5 will add GuessButtons and ScoreBoard components here */}
+        {!gameState.isPlaying && currentTrack && (
+          <div className="game-status">
+            <p>Waiting for host to start the playlist...</p>
           </div>
         )}
-        <div className="player-guesses">
-          <h2>Who added this song?</h2>
-          <div className="player-list">
-            {gameState.players.map(player => (
-              <button
-                key={player.id}
-                onClick={() => handleGuess(player.id)}
-                className={`player-button ${selectedPlayer === player.id ? 'selected' : ''}`}
-                disabled={isPlaying}
-              >
-                {player.name}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
-
-  function canStartGame(): boolean {
-    if(!gameState?.players) return false;
-    return gameState.players.length >=2 && gameState.players.every(player => player.isReady === true);
-  }
 }; 

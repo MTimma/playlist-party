@@ -64,6 +64,37 @@ export interface TrackProposal {
   reason?: string; // For rejection reason
 }
 
+// NEW - Game state interface as per game.md specification
+export interface GameState {
+  lobbyId: string;
+  currentTrackUri: string;
+  currentRound: number;
+  trackOwnerId: string;
+  isPlaying: boolean;
+  progressMs: number;
+  startedAt: Timestamp;
+  endedAt?: Timestamp;
+  guessWindowMs: number; // default 30000
+  roundWinnerId?: string;
+  disableGuessing?: boolean;
+}
+
+// NEW - Guess interface as per game.md specification
+export interface Guess {
+  id: string;          // auto-id
+  playerId: string;    // who guessed
+  trackUri: string;    // which track
+  guessedOwnerId: string;
+  isCorrect: boolean;
+  createdAt: Timestamp;
+}
+
+// NEW - PlayerScore interface as per game.md specification
+export interface PlayerScore {
+  playerId: string;
+  score: number;
+}
+
 // Legacy interface for backward compatibility
 export interface Song {
   id: string;
@@ -73,8 +104,8 @@ export interface Song {
   uri: string;
 }
 
-// Legacy interface for backward compatibility
-export interface GameState {
+// Legacy interface for backward compatibility - renamed to avoid conflicts
+export interface LegacyGameState {
   id: string;
   host: Player;
   players: Player[];
