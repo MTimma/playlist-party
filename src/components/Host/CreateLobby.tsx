@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createLobby } from '../../services/firebase';
 import './CreateLobby.css';
@@ -8,7 +8,13 @@ export const CreateLobby = () => {
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [isCreating, setIsCreating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [spotifyUser, setSpotifyUser] = useState<any>(null);
+  interface SpotifyUser {
+    id: string;
+    display_name: string;
+    images?: { url: string }[];
+  }
+
+  const [spotifyUser, setSpotifyUser] = useState<SpotifyUser | null>(null);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
 
@@ -16,11 +22,27 @@ export const CreateLobby = () => {
     checkAuthStatus();
   }, []);
 
+  const fetchSpotifyUser = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/me`, {
+        credentials: 'include',
+      });
+      const data = (await response.json()) as SpotifyUser;
+      setSpotifyUser(data);
+      if (data.display_name && !hostName) {
+        setHostName(data.display_name);
+      }
+    } catch (error) {
+      console.error('Error fetching Spotify user:', error);
+      setSpotifyUser(null);
+    }
+  }, [hostName]);
+
   useEffect(() => {
     if (isAuthenticated) {
-      fetchSpotifyUser();
+      void fetchSpotifyUser();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchSpotifyUser]);
 
   const checkAuthStatus = async () => {
     try {
@@ -31,22 +53,6 @@ export const CreateLobby = () => {
       setIsAuthenticated(data.isAuthenticated);
     } catch {
       setIsAuthenticated(false);
-    }
-  };
-
-  const fetchSpotifyUser = async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/me`, {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      setSpotifyUser(data);
-      if (data.display_name && !hostName) {
-        setHostName(data.display_name);
-      }
-    } catch (error) {
-      console.error('Error fetching Spotify user:', error);
-      setSpotifyUser(null);
     }
   };
 
@@ -79,9 +85,7 @@ export const CreateLobby = () => {
     }
   };
 
-  const generateShareableLink = () => {
-    return `${window.location.origin}/join`;
-  };
+  // Note: previously unused `generateShareableLink` removed to satisfy linter.
 
   if (!isAuthenticated) {
     return (

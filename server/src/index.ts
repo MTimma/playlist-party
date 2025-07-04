@@ -1,4 +1,4 @@
-import express, { Request, Response, RequestHandler } from 'express';
+import express, { RequestHandler } from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -384,25 +384,53 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
       timeout: 5000
     });
     
-    // Transform the response to match our Track interface
-    const tracks = searchResponse.data.tracks?.items?.map((track: any) => ({
+    // Explicitly type the Spotify track item we expect from the API
+    interface SpotifyArtist {
+      name: string;
+      id: string;
+    }
+
+    interface SpotifyAlbumImage {
+      url: string;
+      height: number;
+      width: number;
+    }
+
+    interface SpotifyAlbum {
+      name: string;
+      images: SpotifyAlbumImage[];
+    }
+
+    interface SpotifyTrackItem {
+      uri: string;
+      name: string;
+      artists: SpotifyArtist[];
+      duration_ms: number;
+      preview_url: string | null;
+      album: SpotifyAlbum;
+    }
+
+    // Transform the response to match our local Track interface
+    const apiTracks = (searchResponse.data.tracks?.items ?? []) as SpotifyTrackItem[];
+
+    const tracks = apiTracks.map((track) => ({
       uri: track.uri,
       name: track.name,
-      artists: track.artists.map((artist: any) => ({
+      artists: track.artists.map((artist) => ({
         name: artist.name,
-        id: artist.id
+        id: artist.id,
       })),
       duration_ms: track.duration_ms,
       preview_url: track.preview_url,
       album: {
         name: track.album.name,
-        images: track.album.images.map((img: any) => ({
+        images: track.album.images.map((img) => ({
           url: img.url,
           height: img.height,
-          width: img.width
-        }))
-      }
-    })) || [];
+          width: img.width,
+        })),
+      },
+    }));
     
     res.json({ tracks });
     

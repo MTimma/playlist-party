@@ -38,9 +38,10 @@ export const JoinLobby = () => {
       await joinLobby(lobbyId.trim(), playerName.trim());
       // Navigate to the lobby as a guest
       navigate(`/lobby/${lobbyId.trim()}`);
-    } catch (error: any) {
-      console.error('Error joining lobby:', error);
-      setError(error.message || 'Failed to join lobby. Please check the lobby ID and try again.');
+    } catch (err: unknown) {
+      console.error('Error joining lobby:', err);
+      const message = err instanceof Error ? err.message : 'Failed to join lobby. Please check the lobby ID and try again.';
+      setError(message);
       setIsJoining(false);
     }
   };

@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { debounce } from 'lodash';
-import { addTrackProposal, addTrackToPlaylist, subscribeTrackProposals } from '../../services/firebase';
+import { addTrackToPlaylist, subscribeTrackProposals } from '../../services/firebase';
 import type { Track, TrackProposal } from '../../types/types';
 import './SearchDialog.css';
 
 interface SearchDialogProps {
   lobbyId: string;
   currentUserId: string;
-  isHost: boolean;
+  isHost?: boolean;
 }
 
 interface SearchResult extends Track {
@@ -15,7 +15,7 @@ interface SearchResult extends Track {
   isDuplicate?: boolean;
 }
 
-export const SearchDialog = ({ lobbyId, currentUserId, isHost }: SearchDialogProps) => {
+export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
