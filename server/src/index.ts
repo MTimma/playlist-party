@@ -1,4 +1,5 @@
-import express, { RequestHandler } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -114,7 +115,7 @@ const getClientCredentialsToken = async (): Promise<string> => {
 };
 
 // 1. Redirect user to Spotify login
-app.get('/login', (_req, res) => {
+app.get('/login', (_req: Request, res: Response) => {
   const scope = [
     'user-read-private',
     'user-read-email',
@@ -129,7 +130,7 @@ app.get('/login', (_req, res) => {
 });
 
 // 2. Handle Spotify callback and exchange code for tokens
-app.get('/callback', (req, res) => {
+app.get('/callback', (req: Request, res: Response) => {
   (async () => {
     const code = req.query.code as string | undefined;
     if (!code) return res.status(400).send('Missing code');
@@ -193,7 +194,7 @@ app.get('/callback', (req, res) => {
 });
 
 // 3. Get current access token
-app.get('/auth/token', ((req, res) => {
+app.get('/auth/token', (req: Request, res: Response) => {
   try {
     const accessToken = req.cookies.spotify_access_token;
     if (!accessToken) {
@@ -203,16 +204,16 @@ app.get('/auth/token', ((req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to get token' });
   }
-}) as RequestHandler);
+});
 
 // 4. Check authentication status
-app.get('/auth/status', (req, res) => {
+app.get('/auth/status', (req: Request, res: Response) => {
   const accessToken = req.cookies.spotify_access_token;
   res.json({ isAuthenticated: !!accessToken });
 });
 
 // 5. Logout
-app.post('/auth/logout', (_req, res) => {
+app.post('/auth/logout', (_req: Request, res: Response) => {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -226,7 +227,7 @@ app.post('/auth/logout', (_req, res) => {
   res.json({ success: true });
 });
 
-app.get('/me', (async (req, res) => {
+app.get('/me', async (req: Request, res: Response) => {
   const accessToken = req.cookies.spotify_access_token;
   if (!accessToken) {
     return res.status(401).json({ error: 'No access token' });
@@ -239,10 +240,10 @@ app.get('/me', (async (req, res) => {
   } catch {
     res.status(500).json({ error: 'Failed to fetch user profile' });
   }
-}) as RequestHandler);
+});
 
 // 7. Create playlist endpoint
-app.post('/api/spotify/playlist', (async (req, res) => {
+app.post('/api/spotify/playlist', async (req: Request, res: Response) => {
   try {
     console.log('=== Playlist Creation Request ===');
     console.log('Cookies received:', req.cookies);
@@ -353,10 +354,10 @@ app.post('/api/spotify/playlist', (async (req, res) => {
       res.status(500).json({ error: 'Failed to create playlist' });
     }
   }
-}) as RequestHandler);
+});
 
 // 8. Search tracks endpoint (using client credentials)
-app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
+app.get('/api/spotify/search', searchLimiter, async (req: Request, res: Response) => {
   try {
     const { q, type = 'track', limit = '10' } = req.query;
     
@@ -451,7 +452,7 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
       res.status(500).json({ error: 'Search failed, please try again' });
     }
   }
-}) as RequestHandler);
+});
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8888;
 app.listen(PORT, () => {
