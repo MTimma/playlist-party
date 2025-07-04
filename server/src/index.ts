@@ -1,6 +1,6 @@
 import express from 'express';
 import type { Request, Response } from 'express';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
@@ -113,6 +113,19 @@ const getClientCredentialsToken = async (): Promise<string> => {
     throw new Error('Failed to authenticate with Spotify');
   }
 };
+
+// Spotify Web API error payload (subset)
+interface SpotifyApiErrorResponse {
+  error: {
+    status?: number;
+    message?: string;
+  };
+}
+
+// Narrow unknown error to AxiosError<SpotifyApiErrorResponse>
+const isSpotifyAxiosError = (
+  err: unknown,
+): err is AxiosError<SpotifyApiErrorResponse> => axios.isAxiosError(err);
 
 // 1. Redirect user to Spotify login
 app.get('/login', (_req: Request, res: Response) => {
@@ -344,8 +357,8 @@ app.post('/api/spotify/playlist', async (req: Request, res: Response): Promise<v
     console.log('Playlist created');
   } catch (err: unknown) {
     console.error('Playlist creation error:', err);
-    if (axios.isAxiosError(err)) {
-      const status = err.response?.status;
+    if (isSpotifyAxiosError(err)) {
+      const status = err.response?.status ?? err.response?.data?.error?.status;
       if (status === 401) {
         res.status(401).json({ error: 'Spotify authentication expired' });
       } else if (status === 403) {
@@ -353,7 +366,7 @@ app.post('/api/spotify/playlist', async (req: Request, res: Response): Promise<v
       } else if (status === 429) {
         res.status(429).json({ error: 'Rate limit exceeded, please try again later' });
       } else {
-        res.status(500).json({ error: 'Failed to create playlist', details: err.response?.data });
+        res.status(500).json({ error: 'Failed to create playlist', details: err.response?.data?.error?.message ?? err.message });
       }
     } else {
       res.status(500).json({ error: 'Failed to create playlist' });
@@ -444,8 +457,8 @@ app.get('/api/spotify/search', searchLimiter, async (req: Request, res: Response
     
   } catch (err: unknown) {
     console.error('Search error:', err);
-    if (axios.isAxiosError(err)) {
-      const status = err.response?.status;
+    if (isSpotifyAxiosError(err)) {
+      const status = err.response?.status ?? err.response?.data?.error?.status;
       if (status === 429) {
         res.status(429).json({ error: 'Rate limit exceeded, please try again later' });
       } else if (status === 401) {
@@ -453,7 +466,7 @@ app.get('/api/spotify/search', searchLimiter, async (req: Request, res: Response
         clientCredentialsCache = null;
         res.status(500).json({ error: 'Authentication failed, please try again' });
       } else {
-        res.status(500).json({ error: 'Search failed, please try again' });
+        res.status(500).json({ error: 'Search failed', details: err.response?.data?.error?.message ?? err.message });
       }
     } else {
       res.status(500).json({ error: 'Search failed, please try again' });
