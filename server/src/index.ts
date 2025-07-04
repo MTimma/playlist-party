@@ -195,8 +195,12 @@ app.get('/callback', (req: Request, res: Response) => {
       res.redirect(`${FRONTEND_URL}/callback`);
     } catch (err: unknown) {
       console.error('Token exchange error:', err);
-      if (axios.isAxiosError(err)) {
-        res.status(500).json({ error: 'Failed to get tokens', details: err.response?.data || err.message });
+      if (isSpotifyAxiosError(err)) {
+        const status = err.response?.status ?? err.response?.data?.error?.status;
+        res.status(status ?? 500).json({
+          error: 'Failed to get tokens',
+          details: err.response?.data?.error?.message ?? err.message,
+        });
       } else if (err instanceof Error) {
         res.status(500).json({ error: 'Failed to get tokens', details: err.message });
       } else {
