@@ -1,4 +1,4 @@
-import express, { Request, Response, RequestHandler } from 'express';
+import express, { RequestHandler } from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -6,8 +6,23 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import * as admin from 'firebase-admin';
 
 dotenv.config();
+
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+    databaseURL: process.env.FIREBASE_DATABASE_URL,
+  });
+}
+
+const db = admin.firestore();
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -67,6 +82,28 @@ interface ClientCredentialsCache {
   token: string;
   expiresAt: number;
 }
+
+// Spotify API response types
+interface SpotifyTrack {
+  uri: string;
+  name: string;
+  artists: Array<{
+    name: string;
+    id: string;
+  }>;
+  duration_ms: number;
+  preview_url: string | null;
+  album: {
+    name: string;
+    images: Array<{
+      url: string;
+      height: number;
+      width: number;
+    }>;
+  };
+}
+
+
 
 let clientCredentialsCache: ClientCredentialsCache | null = null;
 
@@ -241,7 +278,37 @@ app.get('/me', (async (req, res) => {
   }
 }) as RequestHandler);
 
-// 7. Create playlist endpoint
+// 7. Store host's Spotify access token
+app.post('/api/game/:lobbyId/host-token', (async (req, res) => {
+  console.log('=== Store Host Token Request ===');
+  console.log('Lobby ID:', req.params.lobbyId);
+  console.log('Request body:', req.body);
+  
+  try {
+    const { lobbyId } = req.params;
+    const { accessToken, spotifyUserId } = req.body;
+    
+    if (!accessToken || !spotifyUserId) {
+      console.log('Missing required fields');
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    console.log('Storing host access token for lobby:', lobbyId);
+    await db.collection('lobbies').doc(lobbyId).update({
+      hostAccessToken: accessToken,
+      hostSpotifyUserId: spotifyUserId
+    });
+
+    console.log('Host token stored successfully');
+    res.json({ success: true, message: 'Host token stored' });
+    
+  } catch (error) {
+    console.error('Store host token error:', error);
+    res.status(500).json({ error: 'Failed to store host token' });
+  }
+}) as RequestHandler);
+
+// 8. Create playlist endpoint
 app.post('/api/spotify/playlist', (async (req, res) => {
   try {
     console.log('=== Playlist Creation Request ===');
@@ -336,6 +403,17 @@ app.post('/api/spotify/playlist', (async (req, res) => {
       tracksAdded: trackUris.length
     });
     console.log('Playlist created');
+    
+    // Store host's access token for playback monitoring
+    const { lobbyId } = req.body;
+    if (lobbyId) {
+      console.log('Storing host access token for lobby:', lobbyId);
+      await db.collection('lobbies').doc(lobbyId).update({
+        hostAccessToken: accessToken,
+        hostSpotifyUserId: userId
+      });
+      console.log('Host token stored for playback monitoring');
+    }
   } catch (error) {
     console.error('Playlist creation error:', error);
     
@@ -385,10 +463,10 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
     });
     
     // Transform the response to match our Track interface
-    const tracks = searchResponse.data.tracks?.items?.map((track: any) => ({
+    const tracks = searchResponse.data.tracks?.items?.map((track: SpotifyTrack) => ({
       uri: track.uri,
       name: track.name,
-      artists: track.artists.map((artist: any) => ({
+      artists: track.artists.map((artist) => ({
         name: artist.name,
         id: artist.id
       })),
@@ -396,7 +474,7 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
       preview_url: track.preview_url,
       album: {
         name: track.album.name,
-        images: track.album.images.map((img: any) => ({
+        images: track.album.images.map((img) => ({
           url: img.url,
           height: img.height,
           width: img.width
@@ -424,6 +502,195 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
     }
   }
 }) as RequestHandler);
+
+// Secure playlist endpoints (server-side access only)
+// 9. Get currently playing track from Spotify (for a specific lobby)
+app.get('/api/spotify/currently-playing/:lobbyId', (async (req, res) => {
+  console.log('=== Get Currently Playing Request ===');
+  console.log('Lobby ID:', req.params.lobbyId);
+  
+  try {
+    const { lobbyId } = req.params;
+    
+    // Get lobby to find host's access token
+    const lobbyDoc = await db.collection('lobbies').doc(lobbyId).get();
+    if (!lobbyDoc.exists) {
+      console.log('Lobby not found:', lobbyId);
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+    
+    const lobbyData = lobbyDoc.data();
+    const hostAccessToken = lobbyData?.hostAccessToken;
+    
+    if (!hostAccessToken) {
+      console.log('No host access token found for lobby:', lobbyId);
+      return res.status(401).json({ error: 'Host not authenticated with Spotify' });
+    }
+
+    console.log('Fetching currently playing track from Spotify for host');
+    const response = await axios.get('https://api.spotify.com/v1/me/player/currently-playing', {
+      headers: {
+        'Authorization': `Bearer ${hostAccessToken}`,
+        'Accept': 'application/json'
+      },
+      timeout: 5000
+    });
+
+    const playbackData = response.data;
+    console.log('Spotify response:', {
+      is_playing: playbackData?.is_playing,
+      track_name: playbackData?.item?.name,
+      progress_ms: playbackData?.progress_ms
+    });
+
+    res.json(playbackData);
+    
+  } catch (error) {
+    console.error('Get currently playing error:', error);
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        res.status(401).json({ error: 'Host Spotify authentication expired' });
+      } else if (error.response?.status === 429) {
+        res.status(429).json({ error: 'Rate limit exceeded, please try again later' });
+      } else {
+        res.status(500).json({ error: 'Failed to get currently playing track' });
+      }
+    } else {
+      res.status(500).json({ error: 'Failed to get currently playing track' });
+    }
+  }
+}) as RequestHandler);
+
+// 10. Get track owner for validation (server only)
+app.post('/api/game/validate-guess', (async (req, res) => {
+  console.log('=== Guess Validation Request ===');
+  console.log('Request body:', req.body);
+  
+  try {
+    const { lobbyId, trackUri, guessedOwnerId, playerId } = req.body;
+    
+    if (!lobbyId || !trackUri || !guessedOwnerId || !playerId) {
+      console.log('Missing required fields');
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Check if player already guessed for this track
+    console.log('Checking if player already guessed:', playerId);
+    const existingGuessQuery = await db.collection('lobbies').doc(lobbyId)
+      .collection('guesses')
+      .where('playerId', '==', playerId)
+      .where('trackUri', '==', trackUri)
+      .get();
+
+    if (!existingGuessQuery.empty) {
+      console.log('Player already guessed for this track');
+      return res.status(400).json({ error: 'Already guessed for this track' });
+    }
+   // Record the guess
+   console.log('Recording guess in database');
+   const guessRef = db.collection('lobbies').doc(lobbyId).collection('guesses').doc();
+   await guessRef.set({
+     playerId,
+     trackUri,
+     guessedOwnerId,
+     createdAt: admin.firestore.FieldValue.serverTimestamp()
+   });
+
+    console.log('Fetching playlist document for lobby:', lobbyId);
+    // Get playlist collection to find track owner
+    const playlistDoc = await db.collection('playlists').doc(lobbyId).get();
+    
+    if (!playlistDoc.exists) {
+      console.log('Playlist not found for lobby:', lobbyId);
+      return res.status(404).json({ error: 'Playlist not found' });
+    }
+
+    const playlistData = playlistDoc.data();
+    const songData = playlistData?.songs?.[trackUri];
+    
+    if (!songData) {
+      console.log('Track not found in playlist:', trackUri);
+      return res.status(404).json({ error: 'Track not found in playlist' });
+    }
+
+    const realOwnerId = songData.addedBy;
+    const isCorrect = realOwnerId === guessedOwnerId;
+    
+    console.log('Guess validation result:', {
+      trackUri,
+      guessedOwnerId,
+      realOwnerId,
+      isCorrect
+    });
+    
+    // Update scores in lobby
+    const scoreChange = isCorrect ? 1 : 0;
+    console.log('Updating scores for player:', playerId, 'change:', scoreChange);
+    await db.collection('lobbies').doc(lobbyId).update({
+      [`playerScores.${playerId}`]: admin.firestore.FieldValue.increment(scoreChange)
+    });
+
+    console.log('Guess validation completed successfully');
+    res.json({ 
+      isCorrect,
+      correctOwnerId: realOwnerId, // Only return if correct for UI feedback
+      scoreChange
+    });
+    
+  } catch (error) {
+    console.error('Guess validation error:', error);
+    res.status(500).json({ error: 'Failed to validate guess' });
+  }
+}) as RequestHandler);
+
+// // 10. Get player's guess for a specific track
+// app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
+//   console.log('=== Get Player Guess Request ===');
+//   console.log('Lobby ID:', req.params.lobbyId);
+//   console.log('Track URI:', req.params.trackUri);
+//   console.log('Player ID from query:', req.query.playerId);
+  
+//   try {
+//     const { lobbyId, trackUri } = req.params;
+//     const playerId = req.query.playerId as string;
+    
+//     if (!playerId) {
+//       console.log('Player ID not provided');
+//       return res.status(400).json({ error: 'Player ID is required' });
+//     }
+
+//     console.log('Fetching guess for player:', playerId);
+//     const guessQuery = await db.collection('lobbies').doc(lobbyId)
+//       .collection('guesses')
+//       .where('playerId', '==', playerId)
+//       .where('trackUri', '==', trackUri)
+//       .get();
+
+//     if (guessQuery.empty) {
+//       console.log('No guess found for this player and track');
+//       return res.json({ hasGuessed: false });
+//     }
+
+//     const guessDoc = guessQuery.docs[0];
+//     const guessData = guessDoc.data();
+    
+//     console.log('Guess found:', guessData);
+//     res.json({ 
+//       hasGuessed: true,
+//       guess: {
+//         id: guessDoc.id,
+//         ...guessData
+//       }
+//     });
+    
+//   } catch (error) {
+//     console.error('Get player guess error:', error);
+//     res.status(500).json({ error: 'Failed to get player guess' });
+//   }
+// }) as RequestHandler);
+
+
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8888;
 app.listen(PORT, () => {

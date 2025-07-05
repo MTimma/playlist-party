@@ -28,12 +28,21 @@ export interface Lobby {
   hostFirebaseUid: string;
   hostSpotifyUserId: string;
   playlistId?: string;
-  playlistName?: string;  // NEW - Custom playlist name
+  playlistName?: string;
   status: 'waiting' | 'collecting_songs' | 'in_progress' | 'finished';
   createdAt: Date | Timestamp;
-  startedAt?: Date | Timestamp;  // NEW - When game actually begins
+  startedAt?: Date | Timestamp;
   maxPlayers: number;
   currentRound?: number;
+  currentTrackUri?: string;
+  isPlaying?: boolean;
+  guessWindowMs?: number; // default 30000
+  disableGuessing?: boolean;
+  
+  playerScores?: {
+    [playerId: string]: number;
+  };
+  
   players: {
     [playerId: string]: Player;
   };
@@ -64,20 +73,6 @@ export interface TrackProposal {
   reason?: string; // For rejection reason
 }
 
-// NEW - Game state interface as per game.md specification
-export interface GameState {
-  lobbyId: string;
-  currentTrackUri: string;
-  currentRound: number;
-  trackOwnerId: string;
-  isPlaying: boolean;
-  progressMs: number;
-  startedAt: Timestamp;
-  endedAt?: Timestamp;
-  guessWindowMs: number; // default 30000
-  roundWinnerId?: string;
-  disableGuessing?: boolean;
-}
 
 // NEW - Guess interface as per game.md specification
 export interface Guess {
@@ -93,6 +88,21 @@ export interface Guess {
 export interface PlayerScore {
   playerId: string;
   score: number;
+}
+
+export interface SpotifyPlaybackResponse {
+  is_playing: boolean;
+  item?: {
+    uri: string;
+    name: string;
+    artists: Array<{ name: string; id: string }>;
+    duration_ms: number;
+    album: {
+      name: string;
+      images: Array<{ url: string; height: number; width: number }>;
+    };
+  };
+  progress_ms?: number;
 }
 
 // Legacy interface for backward compatibility

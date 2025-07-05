@@ -1,24 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
-  subscribeGameState, 
   subscribePlaylistCollection, 
-  subscribeLobby 
+  subscribeLobby
 } from '../../services/firebase';
+import { getCurrentlyPlaying } from '../../services/backend';
 import { TrackInfo } from '../TrackInfo/TrackInfo';
-import type { GameState, Track, PlaylistCollection, Lobby } from '../../types/types';
+import type { Track, PlaylistCollection, Lobby } from '../../types/types';
 import './Game.css';
 
 export const Game = () => {
   const { lobbyId } = useParams<{ lobbyId: string }>();
-  const [gameState, setGameState] = useState<GameState | null>(null);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [playlistCollection, setPlaylistCollection] = useState<PlaylistCollection | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progressMs, setProgressMs] = useState(0);
 
-  // Subscribe to lobby status to determine if game should be active
+  // Subscribe to lobby (now contains game state)
   useEffect(() => {
     if (!lobbyId) return;
     
@@ -32,18 +32,6 @@ export const Game = () => {
     return () => unsubscribe();
   }, [lobbyId]);
 
-  // Subscribe to game state when lobby is in progress
-  useEffect(() => {
-    if (!lobbyId || !lobby || lobby.status !== 'in_progress') return;
-    
-    const unsubscribe = subscribeGameState(lobbyId, (state) => {
-      setGameState(state);
-      setLoading(false);
-    });
-    
-    return () => unsubscribe();
-  }, [lobbyId, lobby]);
-
   // Subscribe to playlist collection to get track info
   useEffect(() => {
     if (!lobbyId) return;
@@ -55,28 +43,61 @@ export const Game = () => {
     return () => unsubscribe();
   }, [lobbyId]);
 
-  // Get current track info when game state changes
+  // Real-time Spotify playback checker - only when game is in progress
   useEffect(() => {
-    if (!gameState || !playlistCollection) {
+    if (!lobby || lobby.status !== 'in_progress') {
+      setIsPlaying(false);
       setCurrentTrack(null);
       return;
     }
 
-    const trackUri = gameState.currentTrackUri;
-    if (!trackUri) {
-      setCurrentTrack(null);
-      return;
-    }
+    const checkSpotifyPlayback = async () => {
+      try {
+        if (!lobbyId) return;
+        const playbackData = await getCurrentlyPlaying(lobbyId);
 
-    // Get track from playlist collection
-    const songData = playlistCollection.songs[trackUri];
-    if (songData) {
-      setCurrentTrack(songData.trackInfo);
-    } else {
-      setCurrentTrack(null);
-      setError('Track not found in playlist');
-    }
-  }, [gameState, playlistCollection]);
+        if (playbackData && playbackData.is_playing && playbackData.item) {
+          const track: Track = {
+            uri: playbackData.item.uri,
+            name: playbackData.item.name,
+            artists: playbackData.item.artists,
+            duration_ms: playbackData.item.duration_ms,
+            album: {
+              name: playbackData.item.album.name,
+              images: playbackData.item.album.images
+            }
+          };
+
+          setCurrentTrack(track);
+          setIsPlaying(true);
+          setProgressMs(playbackData.progress_ms || 0);
+        } else {
+          setIsPlaying(false);
+          setCurrentTrack(null);
+          setProgressMs(0);
+        }
+      } catch (error) {
+        console.error('Error checking Spotify playback:', error);
+        setIsPlaying(false);
+        setCurrentTrack(null);
+      }
+    };
+
+    // Initial check
+    checkSpotifyPlayback();
+
+    // Set up interval to check every second
+    const intervalId = setInterval(checkSpotifyPlayback, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [lobby]);
+
+  // Helper function to get track owner (needed for guessing game)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const getTrackOwner = (trackUri: string): string | null => {
+    if (!playlistCollection) return null;
+    return playlistCollection.songs[trackUri]?.addedBy || null;
+  };
 
   // Handle loading state
   if (loading) {
@@ -90,17 +111,7 @@ export const Game = () => {
     );
   }
 
-  // Handle error state
-  if (error) {
-    return (
-      <div className="game-container">
-        <div className="error">
-          <h2>Error</h2>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
+
 
   // Handle lobby not in progress
   if (!lobby || lobby.status !== 'in_progress') {
@@ -114,45 +125,36 @@ export const Game = () => {
     );
   }
 
-  // Handle no game state
-  if (!gameState) {
-    return (
-      <div className="game-container">
-        <div className="waiting">
-          <h2>Waiting for Game State</h2>
-          <p>Setting up the game...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate progress start time for live updates
-  const progressStartTime = gameState.startedAt instanceof Date 
-    ? gameState.startedAt 
-    : gameState.startedAt.toDate();
-
   return (
     <div className="game-container">
       <div className="game-header">
         <h1>Music Guessing Game</h1>
         <div className="round-info">
-          <span>Round {gameState.currentRound}</span>
+          <span>Round {lobby.currentRound || 1}</span>
         </div>
       </div>
 
       <div className="game-content">
-        <TrackInfo 
-          track={currentTrack}
-          progressMs={gameState.progressMs}
-          isPlaying={gameState.isPlaying}
-          startedAt={progressStartTime}
-        />
-        
-        {/* Phase 5 will add GuessButtons and ScoreBoard components here */}
-        {!gameState.isPlaying && currentTrack && (
-          <div className="game-status">
-            <p>Waiting for host to start the playlist...</p>
-          </div>
+        {isPlaying && currentTrack ? (
+          <>
+            <TrackInfo 
+              track={currentTrack}
+              isPlaying={true}
+              startedAt={new Date(Date.now() - progressMs)}
+            />
+            
+            {/* TODO: Add GuessButtons component here */}
+            <div className="guessing-section">
+              <h3>Who added this song?</h3>
+              <p>🎵 {currentTrack.name} by {currentTrack.artists.map(a => a.name).join(', ')}</p>
+              {/* GuessButtons will go here */}
+            </div>
+          </>
+        ) : (
+          <div className="waiting-for-host">
+            <div className="waiting-icon">⏸️</div>
+            <h2>Waiting for Host to play Spotify</h2>
+            </div>
         )}
       </div>
     </div>

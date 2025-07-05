@@ -21,8 +21,8 @@ import {
   type User,
   connectAuthEmulator
 } from 'firebase/auth';
-import { useState, useEffect } from 'react';
-import type { Lobby, Player, GameState, LegacyGameState, Song, Track, TrackProposal, PlaylistCollection, Guess, PlayerScore } from '../types/types';
+
+import type { Lobby, Player, LegacyGameState, Song, Track, TrackProposal, PlaylistCollection, PlayerScore } from '../types/types';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -317,8 +317,8 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
     startedAt: new Date()
   });
 
-  // Create initial game state
-  await createInitialGameState(lobbyId, trackUris, playlistData.songs);
+  // Initialize game state in lobby
+  await initializeGameStateInLobby(lobbyId, trackUris);
 
   // Create playlist collection document for tracking
   await setDoc(doc(db, 'playlists', lobbyId), {
@@ -331,43 +331,24 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
   });
 };
 
-// Create initial game state when game starts
-export const createInitialGameState = async (
+// Initialize game state in lobby when game starts
+export const initializeGameStateInLobby = async (
   lobbyId: string, 
-  trackUris: string[], 
-  songs: PlaylistCollection['songs']
+  trackUris: string[]
 ): Promise<void> => {
   if (trackUris.length === 0) {
     throw new Error('No tracks available for game');
   }
 
-  // Get the first track and its owner
-  const firstTrackUri = trackUris[0];
-  const firstSongData = songs[firstTrackUri];
-  
-  if (!firstSongData) {
-    throw new Error('First track data not found');
-  }
-
-  const initialGameState: Omit<GameState, 'startedAt'> = {
-    lobbyId,
-    currentTrackUri: firstTrackUri,
-    currentRound: 1,
-    trackOwnerId: firstSongData.addedBy,
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  await updateDoc(lobbyRef, {
     isPlaying: false,
-    progressMs: 0,
     guessWindowMs: 30000, // 30 seconds
-    disableGuessing: false
-  };
-
-  const gameStateRef = doc(db, 'games', lobbyId, 'state', 'current');
-  await setDoc(gameStateRef, {
-    ...initialGameState,
-    startedAt: serverTimestamp()
+    disableGuessing: false,
+    playerScores: {}
   });
 };
 
-// Legacy functions for backward compatibility
 export const createGame = async (host: Player): Promise<string> => {
   const gameRef = doc(collection(db, 'games'));
   const gameId = gameRef.id;
@@ -419,19 +400,9 @@ export const startGame = async (lobbyId: string): Promise<void> => {
   });
 };
 
-export const updateGameState = async (gameId: string, updates: Partial<GameState>) => {
-  const gameRef = doc(db, 'games', gameId);
-  await updateDoc(gameRef, updates);
-};
-
-export const subscribeToGame = (gameId: string, callback: (game: GameState) => void) => {
-  const gameRef = doc(db, 'games', gameId);
-  return onSnapshot(gameRef, (doc) => {
-    if (doc.exists()) {
-      const game = doc.data() as GameState;
-      callback(game);
-    }
-  });
+export const updateGameState = async (lobbyId: string, updates: Partial<Lobby>) => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  await updateDoc(lobbyRef, updates);
 };
 
 // Track Proposal functions
@@ -626,9 +597,13 @@ export const subscribePlaylistCollection = (
             uri,
             {
               ...songData as Record<string, unknown>,
-              addedAt: (songData as Record<string, unknown>).addedAt && typeof (songData as Record<string, unknown>).addedAt === 'object' && 'toDate' in (songData as Record<string, unknown>).addedAt 
-                ? (songData as Record<string, unknown>).addedAt.toDate() 
-                : new Date()
+              addedAt: (() => {
+                const addedAt = (songData as Record<string, unknown>).addedAt;
+                if (addedAt && typeof addedAt === 'object' && 'toDate' in addedAt) {
+                  return (addedAt as { toDate(): Date }).toDate();
+                }
+                return new Date();
+              })()
             }
           ])
         )
@@ -641,25 +616,7 @@ export const subscribePlaylistCollection = (
   });
 };
 
-export const subscribeGameState = (
-  lobbyId: string, 
-  callback: (gameState: GameState | null) => void
-) => {
-  const gameStateRef = doc(db, 'games', lobbyId, 'state', 'current');
-  
-  return onSnapshot(gameStateRef, (doc) => {
-    if (doc.exists()) {
-      const data = doc.data();
-      const gameState: GameState = {
-        ...data,
-        startedAt: data.startedAt?.toDate() || new Date()
-      } as GameState;
-      callback(gameState);
-    } else {
-      callback(null);
-    }
-  });
-};
+// Game state is now part of lobby, so we use subscribeLobby instead
 
 export const getTrackInfo = async (/* trackUri: string */): Promise<Track | null> => {
   // TODO: Implement Spotify API call to get track info
@@ -680,28 +637,7 @@ export const getTrackOwner = async (lobbyId: string, trackUri: string): Promise<
   return songData?.addedBy || null;
 };
 
-export const createGuess = async (
-  lobbyId: string,
-  playerId: string,
-  trackUri: string,
-  guessedOwnerId: string
-): Promise<void> => {
-  const guessRef = doc(collection(db, 'games', lobbyId, 'guesses'));
-  
-  const guess: Guess = {
-    id: guessRef.id,
-    playerId,
-    trackUri,
-    guessedOwnerId,
-    createdAt: serverTimestamp() as unknown as Date,
-    isCorrect: false // Will be set by Cloud Function
-  };
 
-  await setDoc(guessRef, {
-    ...guess,
-    createdAt: serverTimestamp()
-  });
-};
 
 export const subscribePlayerScores = (
   lobbyId: string,
@@ -722,23 +658,4 @@ export const subscribePlayerScores = (
   });
 };
 
-export const useGameState = (lobbyId: string) => {
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!lobbyId) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = subscribeGameState(lobbyId, (state) => {
-      setGameState(state);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [lobbyId]);
-
-  return { gameState, loading };
-}; 
+// Game state is now part of lobby, so we use subscribeLobby instead 

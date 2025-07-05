@@ -118,6 +118,60 @@
   font-weight: 500;
 }
 
+.waiting-for-host {
+  text-align: center;
+  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin: 40px 0;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.waiting-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.waiting-for-host h2 {
+  color: #ffffff;
+  margin-bottom: 10px;
+  font-size: 1.8rem;
+}
+
+.waiting-for-host p {
+  color: #e0e0e0;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+}
+
+.waiting-for-host .small-text {
+  font-size: 14px;
+  color: #bdbdbd;
+}
+
+.guessing-section {
+  text-align: center;
+  padding: 20px;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 8px;
+  margin: 20px 0;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.guessing-section h3 {
+  color: #4caf50;
+  margin-bottom: 10px;
+  font-size: 1.4rem;
+}
+
+.guessing-section p {
+  color: #e8f5e8;
+  font-size: 16px;
+  margin: 0;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .game-container {

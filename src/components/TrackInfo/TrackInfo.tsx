@@ -1,31 +1,61 @@
 import { useEffect, useState } from 'react';
+import { getCurrentPlaybackState } from '../../services/spotify';
 import type { Track } from '../../types/types';
 import './TrackInfo.css';
 
 interface TrackInfoProps {
   track: Track | null;
-  progressMs: number;
   isPlaying: boolean;
   startedAt: Date;
 }
 
-export const TrackInfo = ({ track, progressMs, isPlaying, startedAt }: TrackInfoProps) => {
-  const [currentProgressMs, setCurrentProgressMs] = useState(progressMs);
+export const TrackInfo = ({ track, isPlaying, startedAt }: TrackInfoProps) => {
+  const [currentProgressMs, setCurrentProgressMs] = useState(0);
+  const [spotifyProgressMs, setSpotifyProgressMs] = useState(0);
 
+  // Get real-time progress from Spotify API
   useEffect(() => {
-    if (!isPlaying) {
-      setCurrentProgressMs(progressMs);
+    if (!isPlaying || !track) {
+      setSpotifyProgressMs(0);
       return;
     }
 
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startedAt.getTime();
-      const estimatedProgress = progressMs + elapsed;
-      setCurrentProgressMs(estimatedProgress);
-    }, 1000); // Update every second
+    const fetchProgress = async () => {
+      try {
+        const playbackState = await getCurrentPlaybackState();
+        if (playbackState && playbackState.item && playbackState.item.uri === track.uri) {
+          setSpotifyProgressMs(playbackState.progress_ms || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching Spotify progress:', error);
+      }
+    };
+
+    // Fetch immediately
+    fetchProgress();
+
+    // Then fetch every second
+    const interval = setInterval(fetchProgress, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, progressMs, startedAt]);
+  }, [isPlaying, track]);
+
+  // Fallback to estimated progress if Spotify API fails
+  useEffect(() => {
+    if (!isPlaying) {
+      setCurrentProgressMs(0);
+      return;
+    }
+
+    if (spotifyProgressMs > 0) {
+      // Use real Spotify progress
+      setCurrentProgressMs(spotifyProgressMs);
+    } else {
+      // Fallback to estimated progress
+      const elapsed = Date.now() - startedAt.getTime();
+      setCurrentProgressMs(elapsed);
+    }
+  }, [isPlaying, spotifyProgressMs, startedAt]);
 
   if (!track) {
     return (
