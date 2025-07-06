@@ -24,7 +24,7 @@ export const Game = () => {
     
     const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
       setLobby(lobbyData);
-      if (lobbyData && lobbyData.status !== 'in_progress') {
+      if (lobbyData && lobbyData.status === 'in_progress') {
         setLoading(false);
       }
     });
