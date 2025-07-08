@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { subscribePlaylistCollection, startGame } from '../../services/firebase';
+import { subscribePlaylistCollection } from '../../services/firebase';
 import type { PlaylistCollection } from '../../types/types';
 import './PlaylistStats.css';
 
 interface PlaylistStatsProps {
   lobbyId: string;
   onStartGame: () => void;
+  allPlayersReady: boolean;
 }
 
-export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
+export const PlaylistStats = ({ lobbyId, onStartGame, allPlayersReady }: PlaylistStatsProps) => {
   const [playlistData, setPlaylistData] = useState<PlaylistCollection | null>(null);
-  const [isStartingGame, setIsStartingGame] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,26 +23,14 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
     return unsubscribe;
   }, [lobbyId]);
 
-  const handleStartGame = async () => {
-    if (!playlistData || playlistData.stats.totalSongs < 2) return;
-    
-    setIsStartingGame(true);
-    setError(null);
-
-    try {
-      await startGame(lobbyId);
-      onStartGame();
-    } catch (err) {
-      console.error('Error starting game:', err);
-      setError('Failed to start game. Please try again.');
-    } finally {
-      setIsStartingGame(false);
-    }
+  const handleStartGame = () => {
+    if (!canStartGame()) return;
+    onStartGame();
   };
 
   const canStartGame = () => {
     if (!playlistData) return false;
-    return playlistData.stats.totalSongs >= 2 && playlistData.stats.playersWithSongs >= 2;
+    return allPlayersReady && playlistData.stats.totalSongs >= 2 && playlistData.stats.playersWithSongs >= 2;
   };
 
     // const canStartGame = () => {
@@ -133,22 +121,15 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
       <div className="start-game-section">
         <button
           onClick={handleStartGame}
-          disabled={!canStartGame() || isStartingGame}
+          disabled={!canStartGame()}
           className={`start-game-btn ${canStartGame() ? 'ready' : 'disabled'}`}
         >
-          {isStartingGame ? (
-            <>
-              <div className="spinner small"></div>
-              <span>Starting Game...</span>
-            </>
-          ) : (
-            <>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-              <span>Start Game</span>
-            </>
-          )}
+          <>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <span>Start Game</span>
+          </>
         </button>
         
         <p className="start-game-note">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { debounce } from 'lodash';
-import { addTrackProposal, addTrackToPlaylist, subscribeTrackProposals } from '../../services/firebase';
-import type { Track, TrackProposal } from '../../types/types';
+import { addTrackToPlaylist, subscribePlaylistCollection } from '../../services/firebase';
+import type { Track } from '../../types/types';
 import './SearchDialog.css';
 
 interface SearchDialogProps {
@@ -19,19 +19,24 @@ export const SearchDialog = ({ lobbyId, currentUserId, isHost }: SearchDialogPro
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [userProposals, setUserProposals] = useState<TrackProposal[]>([]);
+  const [duplicateTrackUris, setDuplicateTrackUris] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Subscribe to user's proposals to show status
+  // Subscribe to playlist collection to know which tracks are already added
   useEffect(() => {
-    if (!lobbyId || !currentUserId) return;
+    if (!lobbyId) return;
 
-    const unsubscribe = subscribeTrackProposals(lobbyId, currentUserId, (proposals) => {
-      setUserProposals(proposals);
+    const unsubscribe = subscribePlaylistCollection(lobbyId, (collection) => {
+      if (!collection) {
+        setDuplicateTrackUris(new Set());
+        return;
+      }
+      const uris = new Set(Object.keys(collection.songs || {}));
+      setDuplicateTrackUris(uris);
     });
 
     return unsubscribe;
-  }, [lobbyId, currentUserId]);
+  }, [lobbyId]);
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -61,7 +66,7 @@ export const SearchDialog = ({ lobbyId, currentUserId, isHost }: SearchDialogPro
         // Check for duplicates against existing proposals
         const resultsWithDuplicateCheck = data.tracks.map((track: Track) => ({
           ...track,
-          isDuplicate: userProposals.some(proposal => proposal.trackUri === track.uri)
+          isDuplicate: duplicateTrackUris.has(track.uri)
         }));
 
         setSearchResults(resultsWithDuplicateCheck);
@@ -73,7 +78,7 @@ export const SearchDialog = ({ lobbyId, currentUserId, isHost }: SearchDialogPro
         setIsSearching(false);
       }
     }, 400),
-    [userProposals]
+    [duplicateTrackUris]
   );
 
   // Trigger search when query changes
@@ -206,56 +211,7 @@ export const SearchDialog = ({ lobbyId, currentUserId, isHost }: SearchDialogPro
         )}
       </div>
 
-      {/* User's proposed tracks */}
-      {userProposals.length > 0 && (
-        <div className="user-proposals">
-          <h4>Your Proposed Tracks</h4>
-          <div className="proposals-list">
-            {userProposals.map((proposal) => (
-              <div key={proposal.trackUri} className="proposal-item">
-                <div className="track-info">
-                  <img 
-                    src={proposal.trackInfo.album.images[2]?.url || proposal.trackInfo.album.images[0]?.url} 
-                    alt={proposal.trackInfo.album.name}
-                    className="track-image small"
-                  />
-                  <div className="track-details">
-                    <h6 className="track-name">{proposal.trackInfo.name}</h6>
-                    <p className="track-artist">
-                      {proposal.trackInfo.artists.map(artist => artist.name).join(', ')}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className={`proposal-status ${proposal.status}`}>
-                  {proposal.status === 'pending' && (
-                    <>
-                      <div className="status-spinner"></div>
-                      <span>Pending</span>
-                    </>
-                  )}
-                  {proposal.status === 'approved' && (
-                    <>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                      </svg>
-                      <span>Added</span>
-                    </>
-                  )}
-                  {proposal.status === 'rejected' && (
-                    <>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                      </svg>
-                      <span>Failed</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Previously shown user proposals have been removed since songs are added directly */}
     </div>
   );
 }; 

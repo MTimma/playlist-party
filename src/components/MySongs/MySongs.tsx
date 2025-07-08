@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { subscribeTrackProposals } from '../../services/firebase';
-import type { TrackProposal } from '../../types/types';
+import { subscribePlaylistCollection } from '../../services/firebase';
+import type { PlaylistCollection, TrackProposal } from '../../types/types';
 import './MySongs.css';
 
 interface MySongsProps {
@@ -9,19 +9,29 @@ interface MySongsProps {
 }
 
 export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
-  const [proposals, setProposals] = useState<TrackProposal[]>([]);
+  const [mySongs, setMySongs] = useState<PlaylistCollection['songs']>({});
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = subscribeTrackProposals(lobbyId, userId, (userProposals) => {
-      const myProposals = userProposals.filter(p => p.proposedBy === userId);
-      setProposals(myProposals);
+    // Subscribe to playlist collection and filter songs added by the current user
+    const unsubscribe = subscribePlaylistCollection(lobbyId, (collection) => {
+      if (!collection) {
+        setMySongs({});
+        return;
+      }
+
+      const userSongs = Object.fromEntries(
+        Object.entries(collection.songs || {}).filter(([_uri, songData]) => songData.addedBy === userId)
+      );
+      setMySongs(userSongs);
     });
 
     return unsubscribe;
   }, [lobbyId, userId]);
 
-  if (proposals.length === 0) {
+  const songCount = Object.keys(mySongs).length;
+
+  if (songCount === 0) {
     return (
       <div className="my-songs empty">
         <div className="empty-state">
@@ -74,9 +84,9 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
     <div className="my-songs">
       <div className="my-songs-header" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="header-content">
-          <h4 className="my-songs-title">My Songs ({proposals.length})</h4>
+          <h4 className="my-songs-title">My Songs ({songCount})</h4>
           <div className="header-stats">
-            {proposals.filter(p => p.status === 'approved').length} added
+            {songCount} added
           </div>
         </div>
         <button className="expand-button" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
@@ -94,13 +104,13 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
 
       {isExpanded && (
         <div className="my-songs-list">
-          {proposals.map((proposal) => (
-            <div key={proposal.trackUri} className={`song-item ${proposal.status}`}>
+          {Object.entries(mySongs).map(([trackUri, song]) => (
+            <div key={trackUri} className="song-item approved">
               <div className="song-album">
-                {proposal.trackInfo.album.images[0] ? (
+                {song.trackInfo.album.images[0] ? (
                   <img
-                    src={proposal.trackInfo.album.images[0].url}
-                    alt={`${proposal.trackInfo.album.name} album cover`}
+                    src={song.trackInfo.album.images[0].url}
+                    alt={`${song.trackInfo.album.name} album cover`}
                     className="album-image"
                   />
                 ) : (
@@ -113,18 +123,13 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
               </div>
 
               <div className="song-info">
-                <div className="song-name">{proposal.trackInfo.name}</div>
-                <div className="song-artist">{formatArtists(proposal.trackInfo.artists)}</div>
+                <div className="song-name">{song.trackInfo.name}</div>
+                <div className="song-artist">{formatArtists(song.trackInfo.artists)}</div>
               </div>
 
               <div className="song-status">
-                {getStatusIcon(proposal.status)}
-                <span className="status-text">{getStatusText(proposal.status)}</span>
-                {proposal.status === 'rejected' && proposal.reason && (
-                  <span className="rejection-reason" title={proposal.reason}>
-                    ({proposal.reason})
-                  </span>
-                )}
+                {getStatusIcon('approved')}
+                <span className="status-text">Added to playlist</span>
               </div>
             </div>
           ))}

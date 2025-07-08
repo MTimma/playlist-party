@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { subscribeLobby, signInAnonymouslyIfNeeded, leaveLobby, updateLobbyStatus, createPlaylistCollection, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
 import { PlayerList } from './PlayerList';
 import { ReadyButton } from '../ReadyButton/ReadyButton';
@@ -12,7 +12,6 @@ import { PlaylistStats } from '../PlaylistStats/PlaylistStats';
 
 export const Lobby = () => {
   const { lobbyId } = useParams<{ lobbyId: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
   const [lobby, setLobby] = useState<LobbyType | null>(null);
@@ -23,7 +22,10 @@ export const Lobby = () => {
   const [copied, setCopied] = useState(false);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
-  const isHost = searchParams.get('host') === 'true';
+  const isHost = useMemo(() => {
+    if (!lobby || !currentUserId) return false;
+    return lobby.hostFirebaseUid === currentUserId;
+  }, [lobby, currentUserId]);
 
   useEffect(() => {
     if (!lobbyId) {
@@ -353,6 +355,7 @@ export const Lobby = () => {
               <PlaylistStats 
                 lobbyId={lobbyId!}
                 onStartGame={handleStartGameRequest}
+                allPlayersReady={getAllPlayersReady()}
               />
             )}
             
