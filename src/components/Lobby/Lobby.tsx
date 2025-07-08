@@ -23,7 +23,7 @@ export const Lobby = () => {
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
   // Determine host based on lobby data instead of URL param
-  const isHost = lobby?.hostFirebaseUid === currentUserId;
+  const isHost = Boolean(lobby?.hostFirebaseUid === currentUserId);
 
   useEffect(() => {
     if (!lobbyId) {
