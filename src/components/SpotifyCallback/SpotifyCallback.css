@@ -42,4 +42,10 @@
 .spotify-callback p {
   margin: 0.5rem 0;
   font-size: 1.1rem;
+}
+
+.callback-note {
+  opacity: 0.8;
+  font-size: 0.9rem !important;
+  margin-top: 1rem !important;
 } 

@@ -232,7 +232,7 @@ describe('CreateLobby Component', () => {
 
       await waitFor(() => {
         expect(createLobby).toHaveBeenCalledWith('Test User', 'test-spotify-id', 8)
-        expect(mockNavigate).toHaveBeenCalledWith('/lobby/test-lobby-id?host=true')
+        expect(mockNavigate).toHaveBeenCalledWith('/lobby/test-lobby-id')
       })
     })
 
