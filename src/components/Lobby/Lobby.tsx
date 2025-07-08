@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { subscribeLobby, signInAnonymouslyIfNeeded, leaveLobby, updateLobbyStatus, createPlaylistCollection, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
 import { PlayerList } from './PlayerList';

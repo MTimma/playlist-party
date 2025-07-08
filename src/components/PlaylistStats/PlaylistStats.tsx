@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { subscribePlaylistCollection, startGame } from '../../services/firebase';
 import type { PlaylistCollection } from '../../types/types';
 import './PlaylistStats.css';
