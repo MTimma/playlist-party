@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import './ReadyButton.css';
 
 interface ReadyButtonProps {
@@ -7,7 +7,7 @@ interface ReadyButtonProps {
   disabled?: boolean;
 }
 
-export const ReadyButton = ({ isReady, onToggleReady, disabled = false }: ReadyButtonProps) => {
+export const ReadyButton: React.FC<ReadyButtonProps> = ({ isReady, onToggleReady, disabled = false }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleToggle = async () => {
