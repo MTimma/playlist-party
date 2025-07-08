@@ -22,8 +22,7 @@ export const Lobby = () => {
   const [shareLink, setShareLink] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
-
-  const isHost = searchParams.get('host') === 'true';
+  const [isHost, setIsHost] = useState(false);
 
   useEffect(() => {
     if (!lobbyId) {
@@ -45,6 +44,10 @@ export const Lobby = () => {
           if (lobbyData) {
             setLobby(lobbyData);
             setError('');
+            
+            // Determine if current user is the host based on lobby data
+            const currentPlayer = lobbyData.players[user.uid];
+            setIsHost(currentPlayer?.isHost === true);
             
             // Navigate to game when status changes to 'in_progress'
             if (lobbyData.status === 'in_progress') {
@@ -325,13 +328,11 @@ export const Lobby = () => {
               isHost={isHost}
             />
             
-            {/* My Songs for non-host players */}
-            {!isHost && (
-              <MySongs 
-                lobbyId={lobbyId!}
-                userId={currentUserId}
-              />
-            )}
+            {/* My Songs for all players */}
+            <MySongs 
+              lobbyId={lobbyId!}
+              userId={currentUserId}
+            />
             
             {/* Ready button for all players */}
             {getCurrentPlayer() && (
@@ -353,6 +354,7 @@ export const Lobby = () => {
               <PlaylistStats 
                 lobbyId={lobbyId!}
                 onStartGame={handleStartGameRequest}
+                allPlayersReady={getAllPlayersReady()}
               />
             )}
             

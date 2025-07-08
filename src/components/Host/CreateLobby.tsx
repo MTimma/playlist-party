@@ -70,8 +70,8 @@ export const CreateLobby = () => {
         maxPlayers
       );
       
-      // Navigate to the lobby with host privileges
-      navigate(`/lobby/${lobbyId}?host=true`);
+      // Navigate to the lobby (host privileges determined by lobby data)
+      navigate(`/lobby/${lobbyId}`);
     } catch (error) {
       console.error('Error creating lobby:', error);
       setError('Failed to create lobby. Please try again.');

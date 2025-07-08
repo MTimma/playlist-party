@@ -8,54 +8,36 @@ const SpotifyCallback = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    if (!code) {
-      setError('Missing code parameter');
+    const error = params.get('error');
+    
+    if (error) {
+      setError(`Authentication failed: ${error}`);
       setTimeout(() => navigate('/'), 3000);
       return;
     }
 
-    const handleCallback = async () => {
+    // Check if authentication was successful by trying to get auth status
+    const checkAuthSuccess = async () => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/callback${window.location.search}`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/status`, {
           credentials: 'include',
-          signal: controller.signal,
-          headers: {
-            'Accept': 'application/json'
-          }
         });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Authentication failed');
-        }
-
         const data = await response.json();
-        if (data.success) {
-          navigate('/');
+        
+        if (data.isAuthenticated) {
+          // Redirect to home page on successful authentication
+          setTimeout(() => navigate('/'), 1500);
         } else {
-          throw new Error('Authentication failed');
+          setError('Authentication was not successful. Please try again.');
+          setTimeout(() => navigate('/'), 3000);
         }
       } catch (err) {
-        if (err instanceof Error) {
-          if (err.name === 'AbortError') {
-            setError('Request timed out. Please try again.');
-          } else {
-            setError(err.message);
-          }
-        } else {
-          setError('Authentication failed');
-        }
+        setError('Failed to verify authentication status.');
         setTimeout(() => navigate('/'), 3000);
       }
     };
 
-    handleCallback();
+    checkAuthSuccess();
   }, [navigate]);
 
   if (error) {
@@ -71,7 +53,7 @@ const SpotifyCallback = () => {
   return (
     <div className="spotify-callback loading">
       <div className="spinner"></div>
-      <p>Authenticating with Spotify...</p>
+      <p>Authentication successful! Redirecting...</p>
     </div>
   );
 };

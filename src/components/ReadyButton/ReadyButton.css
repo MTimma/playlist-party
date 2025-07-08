@@ -13,6 +13,7 @@
   background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
   color: white;
   min-width: 120px;
+  max-width: 200px;
   justify-content: center;
 }
 
@@ -80,5 +81,6 @@
     padding: 0.625rem 1.25rem;
     font-size: 0.8rem;
     min-width: 100px;
+    max-width: 150px;
   }
 } 
