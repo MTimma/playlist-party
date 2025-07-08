@@ -20,9 +20,16 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
         return;
       }
 
-      const songs = Object.entries(collection.songs || {})
-        .filter(([_, songData]) => (songData as any).addedBy === userId)
-        .map(([_, songData]) => (songData as any).trackInfo as Track);
+      type SongEntry = {
+        addedBy: string;
+        trackInfo: Track;
+      };
+
+      const songEntries = Object.values(collection.songs || {}) as SongEntry[];
+
+      const songs: Track[] = songEntries
+        .filter(song => song.addedBy === userId)
+        .map(song => song.trackInfo);
 
       setMySongs(songs);
     });
