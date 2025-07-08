@@ -13,7 +13,10 @@
   background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
   color: white;
   min-width: 120px;
+  max-width: 200px;
+  width: auto;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .ready-button:disabled {
@@ -47,6 +50,8 @@
 
 .ready-button.loading {
   pointer-events: none;
+  min-width: 120px;
+  max-width: 200px;
 }
 
 .ready-icon {

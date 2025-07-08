@@ -37,6 +37,7 @@ const SpotifyCallback = () => {
 
         const data = await response.json();
         if (data.success) {
+          // Successful authentication - navigate immediately without delay
           navigate('/');
         } else {
           throw new Error('Authentication failed');
@@ -71,7 +72,8 @@ const SpotifyCallback = () => {
   return (
     <div className="spotify-callback loading">
       <div className="spinner"></div>
-      <p>Authenticating with Spotify...</p>
+      <p>Completing Spotify authentication...</p>
+      <p className="callback-note">You will be redirected automatically.</p>
     </div>
   );
 };
