@@ -11,7 +11,7 @@ interface PlaylistStatsProps {
 
 export const PlaylistStats = ({ lobbyId, onStartGame, allPlayersReady }: PlaylistStatsProps) => {
   const [playlistData, setPlaylistData] = useState<PlaylistCollection | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // We no longer maintain local error state here (handled in parent)
 
   useEffect(() => {
     if (!lobbyId) return;
@@ -111,12 +111,6 @@ export const PlaylistStats = ({ lobbyId, onStartGame, allPlayersReady }: Playlis
           </div>
         )}
       </div>
-
-      {error && (
-        <div className="start-game-error">
-          <span>{error}</span>
-        </div>
-      )}
 
       <div className="start-game-section">
         <button

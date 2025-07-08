@@ -21,7 +21,7 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
       }
 
       const userSongs = Object.fromEntries(
-        Object.entries(collection.songs || {}).filter(([_uri, songData]) => songData.addedBy === userId)
+        Object.entries(collection.songs || {}).filter(([, songData]) => songData.addedBy === userId)
       );
       setMySongs(userSongs);
     });
