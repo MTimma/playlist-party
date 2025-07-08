@@ -13,7 +13,9 @@
   background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
   color: white;
   min-width: 120px;
+  max-width: 200px;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .ready-button:disabled {
@@ -29,7 +31,6 @@
 .ready-button.not-ready:hover:not(:disabled) {
   background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
   border-color: #1DB954;
-  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
 }
 
@@ -42,7 +43,6 @@
 .ready-button.ready:hover:not(:disabled) {
   background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
   border-color: #6b7280;
-  transform: translateY(-1px);
 }
 
 .ready-button.loading {

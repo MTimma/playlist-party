@@ -296,7 +296,7 @@ describe('Firebase Service', () => {
         await expect(joinLobby('test-lobby-id', 'Player Name')).rejects.toThrow('Lobby is full')
       })
 
-      it('should throw error when player already in lobby', async () => {
+      it('should return true when player already in lobby', async () => {
         const mockUser = createMockUser('existing-player-uid')
         const mockLobby = createMockLobby({
           status: 'waiting',
@@ -328,7 +328,9 @@ describe('Firebase Service', () => {
           data: () => mockLobby,
         })
 
-        await expect(joinLobby('test-lobby-id', 'Player Name')).rejects.toThrow('Player already in lobby')
+        const result = await joinLobby('test-lobby-id', 'Player Name')
+        expect(result).toBe(true)
+        expect(updateDoc).not.toHaveBeenCalled()
       })
     })
 

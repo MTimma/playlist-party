@@ -138,8 +138,9 @@ export const joinLobby = async (lobbyId: string, playerName: string): Promise<bo
       throw new Error('Lobby is full');
     }
     
+    // If player is already in lobby, just return true
     if (lobby.players[user.uid]) {
-      throw new Error('Player already in lobby');
+      return true;
     }
     
     const newPlayer: Player = {

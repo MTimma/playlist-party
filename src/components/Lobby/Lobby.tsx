@@ -23,7 +23,8 @@ export const Lobby = () => {
   const [copied, setCopied] = useState(false);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
-  const isHost = searchParams.get('host') === 'true';
+  // Determine host status from lobby data instead of URL parameter
+  const isHost = lobby ? lobby.hostId === currentUserId : false;
 
   useEffect(() => {
     if (!lobbyId) {
@@ -325,13 +326,11 @@ export const Lobby = () => {
               isHost={isHost}
             />
             
-            {/* My Songs for non-host players */}
-            {!isHost && (
-              <MySongs 
-                lobbyId={lobbyId!}
-                userId={currentUserId}
-              />
-            )}
+            {/* My Songs for all players (including host) */}
+            <MySongs 
+              lobbyId={lobbyId!}
+              userId={currentUserId}
+            />
             
             {/* Ready button for all players */}
             {getCurrentPlayer() && (
@@ -353,6 +352,7 @@ export const Lobby = () => {
               <PlaylistStats 
                 lobbyId={lobbyId!}
                 onStartGame={handleStartGameRequest}
+                allPlayersReady={getAllPlayersReady()}
               />
             )}
             

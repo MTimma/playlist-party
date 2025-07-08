@@ -5,17 +5,30 @@ import './SpotifyCallback.css';
 const SpotifyCallback = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
+    const errorParam = params.get('error');
+    
+    // Handle Spotify OAuth errors
+    if (errorParam) {
+      setError(`Spotify authentication failed: ${errorParam}`);
+      setTimeout(() => navigate('/'), 3000);
+      return;
+    }
+    
     if (!code) {
-      setError('Missing code parameter');
+      setError('Missing authorization code');
       setTimeout(() => navigate('/'), 3000);
       return;
     }
 
     const handleCallback = async () => {
+      if (isProcessing) return; // Prevent duplicate calls
+      setIsProcessing(true);
+      
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -31,13 +44,16 @@ const SpotifyCallback = () => {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Authentication failed');
+          if (response.status !== 400) { // Don't show error for expected redirects
+            const errorData = await response.json().catch(() => ({ error: 'Authentication failed' }));
+            throw new Error(errorData.error || 'Authentication failed');
+          }
         }
 
-        const data = await response.json();
-        if (data.success) {
-          navigate('/');
+        const data = await response.json().catch(() => ({ success: true }));
+        if (data.success || response.ok) {
+          // Small delay to ensure cookies are set
+          setTimeout(() => navigate('/'), 100);
         } else {
           throw new Error('Authentication failed');
         }
@@ -56,7 +72,7 @@ const SpotifyCallback = () => {
     };
 
     handleCallback();
-  }, [navigate]);
+  }, [navigate, isProcessing]);
 
   if (error) {
     return (
