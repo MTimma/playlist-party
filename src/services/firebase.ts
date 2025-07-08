@@ -139,7 +139,9 @@ export const joinLobby = async (lobbyId: string, playerName: string): Promise<bo
     }
     
     if (lobby.players[user.uid]) {
-      throw new Error('Player already in lobby');
+      // Player is already in lobby, just return success
+      // The UI will navigate them to the lobby
+      return true;
     }
     
     const newPlayer: Player = {

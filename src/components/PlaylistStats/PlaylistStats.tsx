@@ -3,12 +3,16 @@ import { subscribePlaylistCollection, startGame } from '../../services/firebase'
 import type { PlaylistCollection } from '../../types/types';
 import './PlaylistStats.css';
 
+import type { Lobby } from '../../types/types';
+
 interface PlaylistStatsProps {
   lobbyId: string;
   onStartGame: () => void;
+  isHost?: boolean;
+  lobby?: Lobby | null;
 }
 
-export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
+export const PlaylistStats = ({ lobbyId, onStartGame, isHost = false, lobby }: PlaylistStatsProps) => {
   const [playlistData, setPlaylistData] = useState<PlaylistCollection | null>(null);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +45,16 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
   };
 
   const canStartGame = () => {
-    if (!playlistData) return false;
-    return playlistData.stats.totalSongs >= 2 && playlistData.stats.playersWithSongs >= 2;
+    if (!playlistData || !lobby) return false;
+    
+    // Check if all players are ready
+    const players = Object.values(lobby.players);
+    const allPlayersReady = players.length >= 2 && players.every(player => player.isReady === true);
+    
+    // Must have enough songs AND all players must be ready
+    return playlistData.stats.totalSongs >= 2 && 
+           playlistData.stats.playersWithSongs >= 2 && 
+           allPlayersReady;
   };
 
     // const canStartGame = () => {
@@ -116,9 +128,23 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
             </svg>
             <span>
-              Need at least 2 songs from 2 players 
-              {playlistData.stats.totalSongs < 2 && ` (${2 - playlistData.stats.totalSongs} more songs needed)`}
-              {playlistData.stats.playersWithSongs < 2 && ` (${2 - playlistData.stats.playersWithSongs} more players need to add songs)`}
+              {(() => {
+                const issues = [];
+                if (playlistData.stats.totalSongs < 2) {
+                  issues.push(`Need ${2 - playlistData.stats.totalSongs} more songs`);
+                }
+                if (playlistData.stats.playersWithSongs < 2) {
+                  issues.push(`${2 - playlistData.stats.playersWithSongs} more players need to add songs`);
+                }
+                if (lobby) {
+                  const players = Object.values(lobby.players);
+                  const notReadyCount = players.filter(p => !p.isReady).length;
+                  if (notReadyCount > 0) {
+                    issues.push(`${notReadyCount} player${notReadyCount > 1 ? 's' : ''} not ready`);
+                  }
+                }
+                return issues.length > 0 ? issues.join(' • ') : 'Waiting for requirements';
+              })()}
             </span>
           </div>
         )}
@@ -130,31 +156,33 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
         </div>
       )}
 
-      <div className="start-game-section">
-        <button
-          onClick={handleStartGame}
-          disabled={!canStartGame() || isStartingGame}
-          className={`start-game-btn ${canStartGame() ? 'ready' : 'disabled'}`}
-        >
-          {isStartingGame ? (
-            <>
-              <div className="spinner small"></div>
-              <span>Starting Game...</span>
-            </>
-          ) : (
-            <>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z"/>
+      {isHost && (
+        <div className="start-game-section">
+          <button
+            onClick={handleStartGame}
+            disabled={!canStartGame() || isStartingGame}
+            className={`start-game-btn ${canStartGame() ? 'ready' : 'disabled'}`}
+          >
+            {isStartingGame ? (
+              <>
+                <div className="spinner small"></div>
+                <span>Starting Game...</span>
+              </>
+            ) : (
+              <>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
               </svg>
               <span>Start Game</span>
-            </>
-          )}
-        </button>
-        
-        <p className="start-game-note">
-          Once started, no more songs can be added and players will begin guessing!
-        </p>
-      </div>
+              </>
+            )}
+          </button>
+          
+          <p className="start-game-note">
+            Once started, no more songs can be added and players will begin guessing!
+          </p>
+        </div>
+      )}
 
       {/* Debug info (can be removed in production) */}
       {import.meta.env.DEV && (

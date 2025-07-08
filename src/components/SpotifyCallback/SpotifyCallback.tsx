@@ -37,7 +37,9 @@ const SpotifyCallback = () => {
 
         const data = await response.json();
         if (data.success) {
+          // Successful authentication - navigate without showing error
           navigate('/');
+          return;
         } else {
           throw new Error('Authentication failed');
         }

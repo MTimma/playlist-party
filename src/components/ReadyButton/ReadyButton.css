@@ -13,7 +13,12 @@
   background: linear-gradient(135deg, #1DB954 0%, #1ed760 100%);
   color: white;
   min-width: 120px;
+  max-width: 200px;
+  width: fit-content;
   justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ready-button:disabled {

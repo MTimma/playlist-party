@@ -70,8 +70,8 @@ export const CreateLobby = () => {
         maxPlayers
       );
       
-      // Navigate to the lobby with host privileges
-      navigate(`/lobby/${lobbyId}?host=true`);
+      // Navigate to the lobby (host status will be determined by matching user ID)
+      navigate(`/lobby/${lobbyId}`);
     } catch (error) {
       console.error('Error creating lobby:', error);
       setError('Failed to create lobby. Please try again.');
@@ -79,9 +79,7 @@ export const CreateLobby = () => {
     }
   };
 
-  const generateShareableLink = () => {
-    return `${window.location.origin}/join`;
-  };
+
 
   if (!isAuthenticated) {
     return (
