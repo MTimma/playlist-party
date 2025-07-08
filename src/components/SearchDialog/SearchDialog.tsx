@@ -7,7 +7,6 @@ import './SearchDialog.css';
 interface SearchDialogProps {
   lobbyId: string;
   currentUserId: string;
-  isHost: boolean;
 }
 
 interface SearchResult extends Track {
@@ -15,7 +14,7 @@ interface SearchResult extends Track {
   isDuplicate?: boolean;
 }
 
-export const SearchDialog = ({ lobbyId, currentUserId, isHost }: SearchDialogProps) => {
+export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);

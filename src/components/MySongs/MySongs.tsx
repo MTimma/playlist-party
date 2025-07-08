@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { subscribePlaylistCollection } from '../../services/firebase';
-import type { PlaylistCollection, TrackProposal } from '../../types/types';
+import type { PlaylistCollection } from '../../types/types';
 import './MySongs.css';
 
 interface MySongsProps {
@@ -49,7 +49,7 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
     return artists.map(artist => artist.name).join(', ');
   };
 
-  const getStatusIcon = (status: TrackProposal['status']) => {
+  const getStatusIcon = (status: 'approved' | 'rejected' | 'pending') => {
     switch (status) {
       case 'approved':
         return (
@@ -69,14 +69,6 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" opacity="0.3"/>
           </svg>
         );
-    }
-  };
-
-  const getStatusText = (status: TrackProposal['status']) => {
-    switch (status) {
-      case 'approved': return 'Added to playlist';
-      case 'rejected': return 'Not added';
-      default: return 'Pending';
     }
   };
 

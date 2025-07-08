@@ -324,7 +324,6 @@ export const Lobby = () => {
             <SearchDialog 
               lobbyId={lobbyId!}
               currentUserId={currentUserId}
-              isHost={isHost}
             />
             
             {/* My Songs for non-host players */}
