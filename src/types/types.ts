@@ -33,7 +33,6 @@ export interface Lobby {
   createdAt: Date | Timestamp;
   startedAt?: Date | Timestamp;
   maxPlayers: number;
-  currentRound?: number;
   currentTrackUri?: string;
   isPlaying?: boolean;
   guessWindowMs?: number; // default 30000

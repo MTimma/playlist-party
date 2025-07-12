@@ -297,7 +297,8 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
     body: JSON.stringify({
       name: playlistName,
       description: `Playlist created for Music Game lobby ${lobbyId} with ${players.length} players`,
-      trackUris: trackUris
+      trackUris: trackUris,
+      lobbyId
     })
   });
 
@@ -309,6 +310,7 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
   const result = await response.json();
 
   // Update lobby with playlist information and status
+  
   await updateDoc(lobbyRef, {
     status: 'in_progress',
     playlistName: playlistName,
@@ -390,14 +392,6 @@ export const addSong = async (gameId: string, song: Song) => {
     const updatedPlaylist = [...game.playlist, song];
     await updateDoc(gameRef, { playlist: updatedPlaylist });
   }
-};
-
-export const startGame = async (lobbyId: string): Promise<void> => {
-  const lobbyRef = doc(db, 'lobbies', lobbyId);
-  await updateDoc(lobbyRef, { 
-    status: 'in_progress',
-    currentRound: 1
-  });
 };
 
 export const updateGameState = async (lobbyId: string, updates: Partial<Lobby>) => {

@@ -18,6 +18,17 @@ export const Game = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progressMs, setProgressMs] = useState(0);
 
+  // Locally increment progress every second for smoother UX
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const intervalId = setInterval(() => {
+      setProgressMs(prev => prev + 1000);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isPlaying]);
+
   // Subscribe to lobby (now contains game state)
   useEffect(() => {
     if (!lobbyId) return;
@@ -70,6 +81,7 @@ export const Game = () => {
 
           setCurrentTrack(track);
           setIsPlaying(true);
+          // Reset progressMs to the value from Spotify; the local timer will continue from here
           setProgressMs(playbackData.progress_ms || 0);
         } else {
           setIsPlaying(false);

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { getCurrentPlaybackState } from '../../services/spotify';
 import type { Track } from '../../types/types';
 import './TrackInfo.css';
 
@@ -11,51 +10,27 @@ interface TrackInfoProps {
 
 export const TrackInfo = ({ track, isPlaying, startedAt }: TrackInfoProps) => {
   const [currentProgressMs, setCurrentProgressMs] = useState(0);
-  const [spotifyProgressMs, setSpotifyProgressMs] = useState(0);
 
-  // Get real-time progress from Spotify API
+  // Compute progress locally based on startedAt timestamp provided by Game component.
   useEffect(() => {
     if (!isPlaying || !track) {
-      setSpotifyProgressMs(0);
-      return;
-    }
-
-    const fetchProgress = async () => {
-      try {
-        const playbackState = await getCurrentPlaybackState();
-        if (playbackState && playbackState.item && playbackState.item.uri === track.uri) {
-          setSpotifyProgressMs(playbackState.progress_ms || 0);
-        }
-      } catch (error) {
-        console.error('Error fetching Spotify progress:', error);
-      }
-    };
-
-    // Fetch immediately
-    fetchProgress();
-
-    // Then fetch every second
-    const interval = setInterval(fetchProgress, 1000);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, track]);
-
-  // Fallback to estimated progress if Spotify API fails
-  useEffect(() => {
-    if (!isPlaying) {
       setCurrentProgressMs(0);
       return;
     }
 
-    if (spotifyProgressMs > 0) {
-      // Use real Spotify progress
-      setCurrentProgressMs(spotifyProgressMs);
-    } else {
-      // Fallback to estimated progress
+    const updateProgress = () => {
       const elapsed = Date.now() - startedAt.getTime();
       setCurrentProgressMs(elapsed);
-    }
-  }, [isPlaying, spotifyProgressMs, startedAt]);
+    };
+
+    // Initial update
+    updateProgress();
+
+    // Update every second
+    const intervalId = setInterval(updateProgress, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isPlaying, track, startedAt]);
 
   if (!track) {
     return (

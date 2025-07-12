@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { subscribePlaylistCollection, startGame } from '../../services/firebase';
+import { subscribePlaylistCollection} from '../../services/firebase';
 import type { PlaylistCollection } from '../../types/types';
 import './PlaylistStats.css';
 
@@ -30,7 +30,6 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
     setError(null);
 
     try {
-      await startGame(lobbyId);
       onStartGame();
     } catch (err) {
       console.error('Error starting game:', err);
