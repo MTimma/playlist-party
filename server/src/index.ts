@@ -569,8 +569,9 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
 
 // Secure playlist endpoints (server-side access only)
 // 9. Get currently playing track from Spotify (for a specific lobby)
+// DEPRECATED: Clients now get playback data from Firebase real-time updates instead of HTTP polling
 app.get('/api/spotify/currently-playing/:lobbyId', (async (req, res) => {
-  console.log('=== Get Currently Playing (Firestore) ===');
+  console.log('=== Get Currently Playing (Firestore) === [DEPRECATED - use Firebase subscription]');
   const { lobbyId } = req.params;
 
   try {

@@ -35,6 +35,18 @@ export interface Lobby {
   maxPlayers: number;
   currentTrackUri?: string;
   isPlaying?: boolean;
+  progressMs?: number;
+  currentTrack?: {
+    uri: string;
+    name: string;
+    artists: Array<{ name: string; id: string }>;
+    duration_ms: number;
+    album: {
+      name: string;
+      images: Array<{ url: string; height: number; width: number }>;
+    };
+  };
+  updatedAt?: Date | Timestamp;
   guessWindowMs?: number; // default 30000
   disableGuessing?: boolean;
   

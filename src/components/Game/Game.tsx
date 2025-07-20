@@ -1,10 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   subscribePlaylistCollection, 
   subscribeLobby
 } from '../../services/firebase';
-import { getCurrentlyPlaying } from '../../services/backend';
 import { TrackInfo } from '../TrackInfo/TrackInfo';
 import type { Track, PlaylistCollection, Lobby } from '../../types/types';
 import './Game.css';
@@ -17,20 +16,7 @@ export const Game = () => {
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progressMs, setProgressMs] = useState(0);
-  const [isTabVisible, setIsTabVisible] = useState(true);
-  const pollingStartedRef = useRef(false);
-
-  // Track tab visibility to handle browser throttling
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      const visible = !document.hidden;
-      setIsTabVisible(visible);
-      console.log('Tab visibility changed:', visible);
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Locally increment progress every second for smoother UX
   useEffect(() => {
@@ -43,14 +29,49 @@ export const Game = () => {
     return () => clearInterval(intervalId);
   }, [isPlaying]);
 
-  // Subscribe to lobby (now contains game state)
+  // Subscribe to lobby (now contains game state AND playback state)
   useEffect(() => {
     if (!lobbyId) return;
     
     const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
       setLobby(lobbyData);
+      
       if (lobbyData && lobbyData.status === 'in_progress') {
         setLoading(false);
+      }
+      
+      // Handle playback state from Firebase real-time updates
+      if (lobbyData) {
+        console.log('Firebase playback update:', {
+          isPlaying: lobbyData.isPlaying,
+          hasCurrentTrack: !!lobbyData.currentTrack,
+          trackName: lobbyData.currentTrack?.name,
+          progressMs: lobbyData.progressMs
+        });
+        
+        if (lobbyData.isPlaying && lobbyData.currentTrack) {
+          // Convert Firebase track data to our Track type
+          const track: Track = {
+            uri: lobbyData.currentTrack.uri,
+            name: lobbyData.currentTrack.name,
+            artists: lobbyData.currentTrack.artists,
+            duration_ms: lobbyData.currentTrack.duration_ms,
+            album: {
+              name: lobbyData.currentTrack.album.name,
+              images: lobbyData.currentTrack.album.images
+            }
+          };
+          
+          setCurrentTrack(track);
+          setIsPlaying(true);
+          setProgressMs(lobbyData.progressMs || 0);
+          setLastUpdated(new Date());
+        } else {
+          setIsPlaying(false);
+          setCurrentTrack(null);
+          setProgressMs(0);
+          setLastUpdated(new Date());
+        }
       }
     });
     
@@ -67,95 +88,6 @@ export const Game = () => {
     
     return () => unsubscribe();
   }, [lobbyId]);
-
-  // Start polling immediately for any lobby - don't wait for Firebase subscription
-  useEffect(() => {
-    if (!lobbyId || pollingStartedRef.current) return;
-    
-    console.log('Starting independent polling for lobby:', lobbyId);
-    pollingStartedRef.current = true;
-    
-    let pollCount = 0;
-    let isMounted = true;
-    
-    const checkSpotifyPlayback = async () => {
-      if (!isMounted) {
-        console.log('Component unmounted, stopping poll');
-        return;
-      }
-      
-      pollCount++;
-      // Only log every 10th poll to reduce noise
-      if (pollCount % 10 === 1) {
-        console.log(`Poll attempt #${pollCount} for lobby ${lobbyId} (tab visible: ${isTabVisible})`);
-      }
-      
-      try {
-        if (!lobbyId) return;
-        const playbackData = await getCurrentlyPlaying(lobbyId);
-        
-        if (!isMounted) return; // Check again after async call
-        
-        // Only log when data changes or every 30 seconds
-        if (pollCount % 30 === 1 || (playbackData?.is_playing !== isPlaying)) {
-          console.log('Playback data received:', { 
-            pollCount,
-            tabVisible: isTabVisible,
-            hasData: !!playbackData, 
-            isPlaying: playbackData?.is_playing, 
-            hasItem: !!playbackData?.item,
-            trackName: playbackData?.item?.name 
-          });
-        }
-
-        if (playbackData && playbackData.is_playing && playbackData.item) {
-          const track: Track = {
-            uri: playbackData.item.uri,
-            name: playbackData.item.name,
-            artists: playbackData.item.artists,
-            duration_ms: playbackData.item.duration_ms,
-            album: {
-              name: playbackData.item.album.name,
-              images: playbackData.item.album.images
-            }
-          };
-
-          setCurrentTrack(track);
-          setIsPlaying(true);
-          // Reset progressMs to the value from Spotify; the local timer will continue from here
-          setProgressMs(playbackData.progress_ms || 0);
-        } else {
-          setIsPlaying(false);
-          setCurrentTrack(null);
-          setProgressMs(0);
-        }
-      } catch (error) {
-        console.error(`Error in poll #${pollCount} for lobby ${lobbyId}:`, error);
-        // Don't stop polling on errors - just reset state and continue
-        if (isMounted) {
-          setIsPlaying(false);
-          setCurrentTrack(null);
-        }
-      }
-    };
-
-    // Initial check
-    checkSpotifyPlayback();
-
-    // Set up interval to check every second
-    console.log('Setting up independent polling interval for lobby:', lobbyId);
-    const intervalId = setInterval(checkSpotifyPlayback, 1000);
-
-    const cleanup = () => {
-      console.log(`Cleaning up independent polling for lobby: ${lobbyId}, completed ${pollCount} polls`);
-      isMounted = false;
-      clearInterval(intervalId);
-      pollingStartedRef.current = false;
-    };
-
-    // Store cleanup function to call it when component unmounts
-    return cleanup;
-  }, [lobbyId]); // Only depend on lobbyId - start once and never restart due to Firebase updates
 
   // Helper function to get track owner (needed for guessing game)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -205,7 +137,7 @@ export const Game = () => {
             <TrackInfo 
               track={currentTrack}
               isPlaying={true}
-              startedAt={new Date(Date.now() - progressMs)}
+              startedAt={new Date(lastUpdated.getTime() - progressMs)}
             />
             
             {/* TODO: Add GuessButtons component here */}
