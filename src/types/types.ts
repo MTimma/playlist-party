@@ -101,21 +101,6 @@ export interface PlayerScore {
   score: number;
 }
 
-export interface SpotifyPlaybackResponse {
-  is_playing: boolean;
-  item?: {
-    uri: string;
-    name: string;
-    artists: Array<{ name: string; id: string }>;
-    duration_ms: number;
-    album: {
-      name: string;
-      images: Array<{ url: string; height: number; width: number }>;
-    };
-  };
-  progress_ms?: number;
-}
-
 // Legacy interface for backward compatibility
 export interface Song {
   id: string;
