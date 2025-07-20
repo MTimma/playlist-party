@@ -1,30 +1,8 @@
-import type { SpotifyPlaybackResponse } from '../types/types';
-
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 if (!BACKEND_URL) {
   throw new Error('VITE_BACKEND_URL environment variable is required');
 }
-
-// Get currently playing track from Spotify via backend
-export const getCurrentlyPlaying = async (lobbyId: string): Promise<SpotifyPlaybackResponse | null> => {
-  const response = await fetch(`${BACKEND_URL}/api/spotify/currently-playing/${lobbyId}`, {
-    credentials: 'include'
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      return null; // Host not authenticated
-    }
-    if (response.status === 404) {
-      return null; // Lobby not found
-    }
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to get currently playing track');
-  }
-
-  return response.json();
-};
 
 // Validate a guess for a track
 export const validateGuess = async (

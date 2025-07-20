@@ -4,7 +4,6 @@ import {
   subscribePlaylistCollection, 
   subscribeLobby
 } from '../../services/firebase';
-import { getCurrentlyPlaying } from '../../services/backend';
 import { TrackInfo } from '../TrackInfo/TrackInfo';
 import type { Track, PlaylistCollection, Lobby } from '../../types/types';
 import './Game.css';
@@ -17,6 +16,7 @@ export const Game = () => {
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progressMs, setProgressMs] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Locally increment progress every second for smoother UX
   useEffect(() => {
@@ -29,14 +29,49 @@ export const Game = () => {
     return () => clearInterval(intervalId);
   }, [isPlaying]);
 
-  // Subscribe to lobby (now contains game state)
+  // Subscribe to lobby (now contains game state AND playback state)
   useEffect(() => {
     if (!lobbyId) return;
     
     const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
       setLobby(lobbyData);
+      
       if (lobbyData && lobbyData.status === 'in_progress') {
         setLoading(false);
+      }
+      
+      // Handle playback state from Firebase real-time updates
+      if (lobbyData) {
+        console.log('Firebase playback update:', {
+          isPlaying: lobbyData.isPlaying,
+          hasCurrentTrack: !!lobbyData.currentTrack,
+          trackName: lobbyData.currentTrack?.name,
+          progressMs: lobbyData.progressMs
+        });
+        
+        if (lobbyData.isPlaying && lobbyData.currentTrack) {
+          // Convert Firebase track data to our Track type
+          const track: Track = {
+            uri: lobbyData.currentTrack.uri,
+            name: lobbyData.currentTrack.name,
+            artists: lobbyData.currentTrack.artists,
+            duration_ms: lobbyData.currentTrack.duration_ms,
+            album: {
+              name: lobbyData.currentTrack.album.name,
+              images: lobbyData.currentTrack.album.images
+            }
+          };
+          
+          setCurrentTrack(track);
+          setIsPlaying(true);
+          setProgressMs(lobbyData.progressMs || 0);
+          setLastUpdated(new Date());
+        } else {
+          setIsPlaying(false);
+          setCurrentTrack(null);
+          setProgressMs(0);
+          setLastUpdated(new Date());
+        }
       }
     });
     
@@ -53,56 +88,6 @@ export const Game = () => {
     
     return () => unsubscribe();
   }, [lobbyId]);
-
-  // Real-time Spotify playback checker - only when game is in progress
-  useEffect(() => {
-    if (!lobby || lobby.status !== 'in_progress') {
-      setIsPlaying(false);
-      setCurrentTrack(null);
-      return;
-    }
-
-    const checkSpotifyPlayback = async () => {
-      try {
-        if (!lobbyId) return;
-        const playbackData = await getCurrentlyPlaying(lobbyId);
-
-        if (playbackData && playbackData.is_playing && playbackData.item) {
-          const track: Track = {
-            uri: playbackData.item.uri,
-            name: playbackData.item.name,
-            artists: playbackData.item.artists,
-            duration_ms: playbackData.item.duration_ms,
-            album: {
-              name: playbackData.item.album.name,
-              images: playbackData.item.album.images
-            }
-          };
-
-          setCurrentTrack(track);
-          setIsPlaying(true);
-          // Reset progressMs to the value from Spotify; the local timer will continue from here
-          setProgressMs(playbackData.progress_ms || 0);
-        } else {
-          setIsPlaying(false);
-          setCurrentTrack(null);
-          setProgressMs(0);
-        }
-      } catch (error) {
-        console.error('Error checking Spotify playback:', error);
-        setIsPlaying(false);
-        setCurrentTrack(null);
-      }
-    };
-
-    // Initial check
-    checkSpotifyPlayback();
-
-    // Set up interval to check every second
-    const intervalId = setInterval(checkSpotifyPlayback, 1000);
-
-    return () => clearInterval(intervalId);
-  }, [lobby]);
 
   // Helper function to get track owner (needed for guessing game)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -152,7 +137,7 @@ export const Game = () => {
             <TrackInfo 
               track={currentTrack}
               isPlaying={true}
-              startedAt={new Date(Date.now() - progressMs)}
+              startedAt={new Date(lastUpdated.getTime() - progressMs)}
             />
             
             {/* TODO: Add GuessButtons component here */}

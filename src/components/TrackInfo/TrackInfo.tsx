@@ -32,7 +32,7 @@ export const TrackInfo = ({ track, isPlaying, startedAt }: TrackInfoProps) => {
     return () => clearInterval(intervalId);
   }, [isPlaying, track, startedAt]);
 
-  if (!track) {
+  if (!track || !isPlaying) {
     return (
       <div className="track-info">
         <div className="waiting-message">
