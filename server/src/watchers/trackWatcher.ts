@@ -114,6 +114,7 @@ class TrackWatcherManager {
     }
 
     try {
+      console.log(`Polling Spotify for lobby ${lobbyId}...`);
       const response = await axios.get('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: {
           'Authorization': `Bearer ${watcherState.accessToken}`,
@@ -128,8 +129,15 @@ class TrackWatcherManager {
         isPlaying: playbackData?.is_playing || false,
         trackUri: playbackData?.item?.uri || null,
         progressMs: playbackData?.progress_ms || 0,
+        currentTrack: playbackData?.item || null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
+
+      console.log(`Updating Firestore for lobby ${lobbyId}:`, {
+        isPlaying: updateData.isPlaying,
+        trackUri: updateData.trackUri,
+        hasTrackData: !!updateData.currentTrack
+      });
 
       await this.db.collection('lobbies').doc(lobbyId).update(updateData);
 
@@ -145,11 +153,22 @@ class TrackWatcherManager {
           const backoffMs = retryAfter ? (parseInt(retryAfter) * 1000) : this.config.defaultBackoffMs;
           watcherState.pauseUntil = Date.now() + backoffMs + 200; // Add 200ms buffer
           console.log(`Rate limited for lobby ${lobbyId}, backing off for ${backoffMs}ms`);
+        } else if (error.response?.status === 204) {
+          // No content - player is not active, but this is not an error
+          console.log(`No active playback for lobby ${lobbyId} (204 response)`);
+          const updateData = {
+            isPlaying: false,
+            trackUri: null,
+            progressMs: 0,
+            currentTrack: null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+          await this.db.collection('lobbies').doc(lobbyId).update(updateData);
         } else {
           console.error(`HTTP error ${error.response?.status} for lobby ${lobbyId}:`, error.response?.data);
         }
       } else {
-        console.error(`Network error for lobby ${lobbyId}:`, error.message);
+        console.error(`Network/timeout error for lobby ${lobbyId}:`, error.message);
       }
     }
   }

@@ -19,6 +19,10 @@ export const getCurrentlyPlaying = async (lobbyId: string): Promise<SpotifyPlayb
     if (response.status === 404) {
       return null; // Lobby not found
     }
+    if (response.status === 204) {
+      // No content - no active playback
+      return { is_playing: false, item: null };
+    }
     const error = await response.json();
     throw new Error(error.error || 'Failed to get currently playing track');
   }

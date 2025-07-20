@@ -54,18 +54,28 @@ export const Game = () => {
     return () => unsubscribe();
   }, [lobbyId]);
 
-  // Real-time Spotify playback checker - only when game is in progress
+  // Real-time Spotify playback checker - continue polling in all lobby states except waiting/finished
   useEffect(() => {
-    if (!lobby || lobby.status !== 'in_progress') {
+    if (!lobby || lobby.status === 'waiting' || lobby.status === 'finished') {
+      console.log('Stopping playback polling - lobby status:', lobby?.status);
       setIsPlaying(false);
       setCurrentTrack(null);
       return;
     }
 
+    console.log('Starting playback polling for lobby:', lobbyId, 'status:', lobby.status);
+    
     const checkSpotifyPlayback = async () => {
       try {
         if (!lobbyId) return;
         const playbackData = await getCurrentlyPlaying(lobbyId);
+        
+        console.log('Playback data received:', { 
+          hasData: !!playbackData, 
+          isPlaying: playbackData?.is_playing, 
+          hasItem: !!playbackData?.item,
+          trackName: playbackData?.item?.name 
+        });
 
         if (playbackData && playbackData.is_playing && playbackData.item) {
           const track: Track = {
@@ -90,6 +100,7 @@ export const Game = () => {
         }
       } catch (error) {
         console.error('Error checking Spotify playback:', error);
+        // Don't stop polling on errors - just reset state and continue
         setIsPlaying(false);
         setCurrentTrack(null);
       }
@@ -101,8 +112,11 @@ export const Game = () => {
     // Set up interval to check every second
     const intervalId = setInterval(checkSpotifyPlayback, 1000);
 
-    return () => clearInterval(intervalId);
-  }, [lobby]);
+    return () => {
+      console.log('Cleaning up playback polling for lobby:', lobbyId);
+      clearInterval(intervalId);
+    };
+  }, [lobby, lobbyId]);
 
   // Helper function to get track owner (needed for guessing game)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

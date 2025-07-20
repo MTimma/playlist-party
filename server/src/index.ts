@@ -581,14 +581,30 @@ app.get('/api/spotify/currently-playing/:lobbyId', (async (req, res) => {
       return res.status(404).json({ error: 'Lobby not found' });
     }
 
+    const lobbyData = lobbyDoc.data();
     const {
       isPlaying = false,
       trackUri = null,
       progressMs = 0,
-      updatedAt = null
-    } = lobbyDoc.data() as { isPlaying?: boolean; trackUri?: string | null; progressMs?: number; updatedAt?: unknown };
+      updatedAt = null,
+      currentTrack = null
+    } = lobbyData as { 
+      isPlaying?: boolean; 
+      trackUri?: string | null; 
+      progressMs?: number; 
+      updatedAt?: unknown;
+      currentTrack?: any;
+    };
 
-    res.json({ isPlaying, trackUri, progressMs, updatedAt });
+    // Transform to SpotifyPlaybackResponse format expected by Game component
+    const response = {
+      is_playing: isPlaying,
+      progress_ms: progressMs,
+      item: currentTrack || null
+    };
+
+    console.log('Current playback state:', { isPlaying, trackUri, hasTrackData: !!currentTrack });
+    res.json(response);
   } catch (error) {
     console.error('Get currently playing (Firestore) error:', error);
     res.status(500).json({ error: 'Failed to fetch playback state' });
@@ -891,6 +907,23 @@ app.get('/api/watchers/:lobbyId', ((req, res) => {
   const info = trackWatcherManager.getWatcherInfo(lobbyId);
   res.json(info);
 }) as RequestHandler);
+
+// Debug endpoint to check watcher status
+app.get('/api/debug/watcher/:lobbyId', (req, res) => {
+  const { lobbyId } = req.params;
+  const info = trackWatcherManager.getWatcherInfo(lobbyId);
+  res.json(info);
+});
+
+// Health check endpoint for monitoring watchers
+app.get('/api/health/watchers', (req, res) => {
+  const watcherCount = trackWatcherManager.getWatcherCount();
+  res.json({
+    activeWatchers: watcherCount,
+    timestamp: new Date().toISOString(),
+    status: 'healthy'
+  });
+});
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8888;
 app.listen(PORT, () => {
