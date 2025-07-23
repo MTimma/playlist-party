@@ -82,7 +82,7 @@ export const TrackInfo = ({ track, isPlaying, startedAt }: TrackInfoProps) => {
           ></div>
         </div>
         <div className="progress-time">
-          <span>{formatTime(currentProgressMs)}</span>
+          <span>{formatTime(currentProgressMs)}</span>/
           <span>{formatTime(track.duration_ms)}</span>
         </div>
       </div>

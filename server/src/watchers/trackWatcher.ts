@@ -168,7 +168,7 @@ class TrackWatcherManager {
           console.error(`HTTP error ${error.response?.status} for lobby ${lobbyId}:`, error.response?.data);
         }
       } else {
-        console.error(`Network/timeout error for lobby ${lobbyId}:`, error.message);
+        console.error(`Network/timeout error for lobby ${lobbyId}:`, error);
       }
     }
   }
