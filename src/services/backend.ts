@@ -10,7 +10,7 @@ export const validateGuess = async (
   playerId: string,
   trackUri: string,
   guessedOwnerId: string
-): Promise<{ isCorrect: boolean; correctOwnerId?: string; scoreChange: number }> => {
+): Promise<{ isCorrect: boolean; correctOwnerId?: string; correctOwnerName?: string; scoreChange: number }> => {
   const response = await fetch(`${BACKEND_URL}/api/game/validate-guess`, {
     method: 'POST',
     headers: {

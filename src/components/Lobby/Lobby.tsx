@@ -123,8 +123,6 @@ export const Lobby = () => {
     try {
       await startGameWithPlaylist(lobbyId, playlistName);
       setShowPlaylistDialog(false);
-      // The Cloud Function will handle the playlist creation and status update
-      // Navigate to game view once status changes to 'in_progress'
     } catch (error) {
       console.error('Error starting game:', error);
       setError('Failed to start game. Please try again.');

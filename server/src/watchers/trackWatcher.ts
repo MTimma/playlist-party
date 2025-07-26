@@ -36,6 +36,7 @@ class TrackWatcherManager {
     hostRefreshToken: string,
     hostSpotifyUserId: string
   ): Promise<void> {
+    
     // Check if watcher already exists for this lobby
     if (this.watchers.has(lobbyId)) {
       console.log(`Watcher already exists for lobby: ${lobbyId}`);
@@ -49,12 +50,23 @@ class TrackWatcherManager {
     }
 
     // Guard against token reuse across lobbies
-    for (const [existingLobbyId, state] of this.watchers.entries()) {
-      if (state.hostSpotifyUserId === hostSpotifyUserId && existingLobbyId !== lobbyId) {
-        console.error(`SECURITY WARNING: Attempted to reuse host token ${hostSpotifyUserId} for lobby ${lobbyId}, already in use by lobby ${existingLobbyId}`);
-        throw new Error('Host token already in use by another lobby');
+    
+    if (!process.env.ALLOW_TOKEN_REUSE) {
+      // 1. Retire any existing watcher belonging to the same Spotify user
+      for (const [existingLobbyId, state] of this.watchers.entries()) {
+        if (state.hostSpotifyUserId === hostSpotifyUserId && existingLobbyId !== lobbyId) {
+          console.warn(
+            `Host ${hostSpotifyUserId} already controls lobby ${existingLobbyId}. ` +
+            `Stopping old watcher and transferring control to lobby ${lobbyId}.`
+          );
+          this.stopWatcher(existingLobbyId);
+          // mark the old lobby ended so clients know
+          await this.db.collection('lobbies')
+                      .doc(existingLobbyId)
+                      .update({ status: 'terminated_by_host' });
+        }
       }
-    }
+    } 
 
     console.log(`Starting watcher for lobby: ${lobbyId}, host: ${hostSpotifyUserId}`);
 
@@ -114,7 +126,8 @@ class TrackWatcherManager {
     }
 
     try {
-      console.log(`Polling Spotify for lobby ${lobbyId}...`);
+
+      console.log(`${new Date().toISOString()} Polling Spotify for lobby ${lobbyId}...`);
       const response = await axios.get('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: {
           'Authorization': `Bearer ${watcherState.accessToken}`,

@@ -29,7 +29,7 @@ export interface Lobby {
   hostSpotifyUserId: string;
   playlistId?: string;
   playlistName?: string;
-  status: 'waiting' | 'collecting_songs' | 'in_progress' | 'finished';
+  status: 'waiting' | 'collecting_songs' | 'in_progress' | 'finished' | 'terminated_by_host';
   createdAt: Date | Timestamp;
   startedAt?: Date | Timestamp;
   maxPlayers: number;
@@ -61,6 +61,7 @@ export interface Lobby {
 
 export interface PlaylistCollection {
   lobbyId: string;
+  createdAt: Date | Timestamp;
   playlistId: string;
   songs: {
     [trackUri: string]: {

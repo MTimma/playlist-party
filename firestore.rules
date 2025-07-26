@@ -59,7 +59,7 @@ service cloud.firestore {
     // Playlist collection rules
     match /playlists/{lobbyId} {
       // Only players in the corresponding lobby can read
-      allow read: if request.auth != null 
+      allow read: if request.auth != null
         && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
         && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys());
       

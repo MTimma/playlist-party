@@ -327,10 +327,10 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
     lobbyId,
     playlistId: result.playlist.id,
     snapshotId: result.playlist.snapshot_id,
-    createdAt: new Date(),
+    updatedAt: serverTimestamp(),
     trackCount: trackUris.length,
     playerCount: players.length,
-  });
+  }, {merge: true});
 };
 
 // Initialize game state in lobby when game starts
@@ -490,6 +490,7 @@ export const createPlaylistCollection = async (
   
   const collection: PlaylistCollection = {
     lobbyId,
+    createdAt: serverTimestamp(),
     playlistId,
     songs: {},
     stats: {

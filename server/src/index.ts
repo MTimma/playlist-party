@@ -622,10 +622,26 @@ app.post('/api/game/validate-guess', (async (req, res) => {
     const realOwnerId = songData.addedBy;
     const isCorrect = realOwnerId === guessedOwnerId;
     
+    // Get lobby data to find player names
+    console.log('Fetching lobby data to get player names');
+    const lobbyDoc = await db.collection('lobbies').doc(lobbyId).get();
+    
+    if (!lobbyDoc.exists) {
+      console.log('Lobby not found:', lobbyId);
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+
+    const lobbyData = lobbyDoc.data();
+    const players = lobbyData?.players || {};
+    
+    // Find the real owner's name
+    const realOwnerName = players[realOwnerId]?.name || 'Unknown';
+    
     console.log('Guess validation result:', {
       trackUri,
       guessedOwnerId,
       realOwnerId,
+      realOwnerName,
       isCorrect
     });
     
@@ -639,13 +655,59 @@ app.post('/api/game/validate-guess', (async (req, res) => {
     console.log('Guess validation completed successfully');
     res.json({ 
       isCorrect,
-      correctOwnerId: realOwnerId, // Only return if correct for UI feedback
+      correctOwnerId: realOwnerId,
+      correctOwnerName: realOwnerName,
       scoreChange
     });
     
   } catch (error) {
     console.error('Guess validation error:', error);
     res.status(500).json({ error: 'Failed to validate guess' });
+  }
+}) as RequestHandler);
+
+// Check if a player has already guessed for a specific track
+app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
+  try {
+    const { lobbyId, trackUri } = req.params;
+    const { playerId } = req.query;
+    
+    if (!playerId || typeof playerId !== 'string') {
+      return res.status(400).json({ error: 'playerId query parameter is required' });
+    }
+
+    const decodedTrackUri = decodeURIComponent(trackUri);
+    
+    console.log('Checking guess status:', { lobbyId, trackUri: decodedTrackUri, playerId });
+    
+    // Query for existing guess
+    const existingGuessQuery = await db.collection('lobbies').doc(lobbyId)
+      .collection('guesses')
+      .where('playerId', '==', playerId)
+      .where('trackUri', '==', decodedTrackUri)
+      .get();
+
+    if (existingGuessQuery.empty) {
+      res.json({ hasGuessed: false });
+    } else {
+      const guessDoc = existingGuessQuery.docs[0];
+      const guessData = guessDoc.data();
+      
+      res.json({ 
+        hasGuessed: true,
+        guess: {
+          id: guessDoc.id,
+          playerId: guessData.playerId,
+          trackUri: guessData.trackUri,
+          guessedOwnerId: guessData.guessedOwnerId,
+          createdAt: guessData.createdAt?.toDate() || new Date()
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error checking guess status:', error);
+    res.status(500).json({ error: 'Failed to check guess status' });
   }
 }) as RequestHandler);
 
