@@ -431,6 +431,23 @@ export const addTrackProposal = async (
   });
 };
 
+export const subscribeUserSongs = (
+  lobbyId: string,
+  userId: string,
+  cb: (tracks: Track[]) => void,
+) => {
+  const ref = doc(db, 'playlists', lobbyId);
+  return onSnapshot(ref, snap => {
+    if (!snap.exists()) { cb([]); return; }
+    const songs = snap.data().songs ?? {};
+    cb(
+      Object.values(songs)
+        .filter((s: any) => s.addedBy === userId)
+        .map((s: any) => ({ ...s.trackInfo } as Track))
+    );
+  });
+};
+
 export const subscribeTrackProposals = (
   lobbyId: string, 
   userId: string, 
