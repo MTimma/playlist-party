@@ -23,6 +23,13 @@ export interface Track {
   };
 }
 
+// NEW - Spotify user profile information returned by the backend `/me` endpoint
+export interface SpotifyUser {
+  id: string;
+  display_name: string;
+  images: Array<{ url: string }>;
+}
+
 export interface Lobby {
   id: string;
   hostFirebaseUid: string;

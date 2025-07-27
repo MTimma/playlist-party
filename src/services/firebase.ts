@@ -490,7 +490,7 @@ export const createPlaylistCollection = async (
   
   const collection: PlaylistCollection = {
     lobbyId,
-    createdAt: serverTimestamp(),
+    createdAt: new Date(),
     playlistId,
     songs: {},
     stats: {
@@ -653,4 +653,37 @@ export const subscribePlayerScores = (
   });
 };
 
-// Game state is now part of lobby, so we use subscribeLobby instead 
+export const subscribeUserSongs = (
+  lobbyId: string,
+  userId: string,
+  cb: (tracks: Track[]) => void,
+) => {
+  const ref = doc(db, 'playlists', lobbyId);
+  return onSnapshot(ref, snap => {
+    if (!snap.exists()) { cb([]); return; }
+    const songs = snap.data().songs ?? {};
+    cb(
+      Object.values(songs)
+        .filter((s: any) => s.addedBy === userId)
+        .map((s: any) => ({ ...s.trackInfo } as Track))
+    );
+  });
+};
+
+export const verifyHostStatus = async (lobbyId: string): Promise<boolean> => {
+  const user = await signInAnonymouslyIfNeeded();
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  
+  try {
+    const lobbyDoc = await getDoc(lobbyRef);
+    if (!lobbyDoc.exists()) {
+      return false;
+    }
+    
+    const lobby = lobbyDoc.data() as Lobby;
+    return lobby.hostFirebaseUid === user.uid;
+  } catch (error) {
+    console.error('Error verifying host status:', error);
+    return false;
+  }
+};

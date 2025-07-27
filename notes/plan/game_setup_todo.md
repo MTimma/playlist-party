@@ -1,5 +1,5 @@
 todo for Lobby.tsx
---- 1. Players do not see their added songs. After adding song, MySongs.tsx is not updated/populated.
+DONE --- 1. Players do not see their added songs. After adding song, MySongs.tsx is not updated/populated.
 
 Root cause
 • MySongs.tsx listens to the sub-collection ​lobbies/{id}/proposals​, but SearchDialog writes straight into ​playlists/{id}​.
@@ -79,7 +79,7 @@ If you move to a sub-collection or change write paths, update Firestore security
 Follow the steps in OPTION A (or OPTION B if you need formal approval flow) and the players’ “My Songs” panel will update in real time as soon as a track is added.
 
 
---- 2. Host does not have MySongs.tsx component. Also, host should see which players are not ready - list of all players
+DONE --- 2. Host does not have MySongs.tsx component. Also, host should see which players are not ready - list of all players
 
 Implementation blueprint for TODO # 2
 (“Host does not have MySongs.tsx component. Also, host should see which players are not ready – list of all players”)
@@ -141,7 +141,7 @@ Potential pitfalls • Race conditions: Firestore updates are near-real-time, bu
 Follow these steps and the host will have full song-viewing capability and an at-a-glance view of who is still preparing, without disrupting existing player flows.
 
 
---- 3. host page is rendered by ?host=true parameter gives control to the game lobby. It should be inferred from host Spotify user session instead of URL flag which can be set by users.
+DONE --- 3. host page is rendered by ?host=true parameter gives control to the game lobby. It should be inferred from host Spotify user session instead of URL flag which can be set by users.
 
 
 Implementation blueprint for TODO # 2

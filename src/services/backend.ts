@@ -1,3 +1,5 @@
+import type { SpotifyUser } from '../types/types';
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 if (!BACKEND_URL) {
@@ -77,4 +79,19 @@ export const storeHostToken = async (
     const error = await response.json();
     throw new Error(error.error || 'Failed to store host token');
   }
+};
+
+// Fetch the authenticated user's Spotify profile
+export const getSpotifyUser = async (): Promise<SpotifyUser> => {
+  const response = await fetch(`${BACKEND_URL}/me`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to fetch Spotify user');
+  }
+
+  return response.json();
 }; 

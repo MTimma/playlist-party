@@ -71,7 +71,7 @@ export const CreateLobby = () => {
       );
       
       // Navigate to the lobby with host privileges
-      navigate(`/lobby/${lobbyId}?host=true`);
+      navigate(`/lobby/${lobbyId}`);
     } catch (error) {
       console.error('Error creating lobby:', error);
       setError('Failed to create lobby. Please try again.');

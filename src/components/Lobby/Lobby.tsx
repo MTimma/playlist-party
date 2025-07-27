@@ -12,7 +12,6 @@ import { PlaylistStats } from '../PlaylistStats/PlaylistStats';
 
 export const Lobby = () => {
   const { lobbyId } = useParams<{ lobbyId: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
   const [lobby, setLobby] = useState<LobbyType | null>(null);
@@ -23,7 +22,7 @@ export const Lobby = () => {
   const [copied, setCopied] = useState(false);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
-  const isHost = searchParams.get('host') === 'true';
+  const isHost = lobby && currentUserId && lobby.hostFirebaseUid === currentUserId;
 
   useEffect(() => {
     if (!lobbyId) {
@@ -320,16 +319,12 @@ export const Lobby = () => {
             <SearchDialog 
               lobbyId={lobbyId!}
               currentUserId={currentUserId}
-              isHost={isHost}
             />
             
-            {/* My Songs for non-host players */}
-            {!isHost && (
               <MySongs 
                 lobbyId={lobbyId!}
                 userId={currentUserId}
               />
-            )}
             
             {/* Ready button for all players */}
             {getCurrentPlayer() && (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { subscribeTrackProposals } from '../../services/firebase';
-import type { TrackProposal } from '../../types/types';
+import { subscribeUserSongs } from '../../services/firebase';
+import type { Track } from '../../types/types';
 import './MySongs.css';
 
 interface MySongsProps {
@@ -9,19 +9,18 @@ interface MySongsProps {
 }
 
 export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
-  const [proposals, setProposals] = useState<TrackProposal[]>([]);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = subscribeTrackProposals(lobbyId, userId, (userProposals) => {
-      const myProposals = userProposals.filter(p => p.proposedBy === userId);
-      setProposals(myProposals);
+    const unsubscribe = subscribeUserSongs(lobbyId, userId, (userTracks) => {
+      setTracks(userTracks);
     });
 
     return unsubscribe;
   }, [lobbyId, userId]);
 
-  if (proposals.length === 0) {
+  if (tracks.length === 0) {
     return (
       <div className="my-songs empty">
         <div className="empty-state">
@@ -39,47 +38,14 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
     return artists.map(artist => artist.name).join(', ');
   };
 
-  const getStatusIcon = (status: TrackProposal['status']) => {
-    switch (status) {
-      case 'approved':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="status-icon approved">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-          </svg>
-        );
-      case 'rejected':
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="status-icon rejected">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.59 5L12 10.59 8.41 7 7 8.41 10.59 12 7 15.59 8.41 17 12 13.41 15.59 17 17 15.59 13.41 12 17 8.41 15.59 7z"/>
-          </svg>
-        );
-      default:
-        return (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="status-icon pending">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" opacity="0.3"/>
-          </svg>
-        );
-    }
-  };
-
-  const getStatusText = (status: TrackProposal['status']) => {
-    switch (status) {
-      case 'approved': return 'Added to playlist';
-      case 'rejected': return 'Not added';
-      default: return 'Pending';
-    }
-  };
-
   return (
     <div className="my-songs">
-      <div className="my-songs-header" onClick={() => setIsExpanded(!isExpanded)}>
+      {/* <div className="my-songs-header" onClick={() => setIsExpanded(!isExpanded)}> */}
+      <div className="my-songs-header" >
         <div className="header-content">
-          <h4 className="my-songs-title">My Songs ({proposals.length})</h4>
-          <div className="header-stats">
-            {proposals.filter(p => p.status === 'approved').length} added
-          </div>
+          
         </div>
-        <button className="expand-button" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
+        {/* <button className="expand-button" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
           <svg 
             width="20" 
             height="20" 
@@ -89,18 +55,18 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
           >
             <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/>
           </svg>
-        </button>
+        </button> */}
       </div>
 
       {isExpanded && (
         <div className="my-songs-list">
-          {proposals.map((proposal) => (
-            <div key={proposal.trackUri} className={`song-item ${proposal.status}`}>
+          {tracks.map((track) => (
+            <div key={track.uri} className="song-item">
               <div className="song-album">
-                {proposal.trackInfo.album.images[0] ? (
+                {track.album.images[0] ? (
                   <img
-                    src={proposal.trackInfo.album.images[0].url}
-                    alt={`${proposal.trackInfo.album.name} album cover`}
+                    src={track.album.images[0].url}
+                    alt={`${track.album.name} album cover`}
                     className="album-image"
                   />
                 ) : (
@@ -113,18 +79,15 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
               </div>
 
               <div className="song-info">
-                <div className="song-name">{proposal.trackInfo.name}</div>
-                <div className="song-artist">{formatArtists(proposal.trackInfo.artists)}</div>
+                <div className="song-name">{track.name}</div>
+                <div className="song-artist">{formatArtists(track.artists)}</div>
               </div>
 
               <div className="song-status">
-                {getStatusIcon(proposal.status)}
-                <span className="status-text">{getStatusText(proposal.status)}</span>
-                {proposal.status === 'rejected' && proposal.reason && (
-                  <span className="rejection-reason" title={proposal.reason}>
-                    ({proposal.reason})
-                  </span>
-                )}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="status-icon approved">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <span className="status-text">Added to playlist</span>
               </div>
             </div>
           ))}

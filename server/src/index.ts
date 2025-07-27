@@ -747,3 +747,31 @@ app.listen(PORT, () => {
   console.log(`Spotify auth server running on port ${PORT}`);
   console.log(`Track watcher manager initialized with max concurrency: ${process.env.WATCHER_MAX_CONCURRENCY || '500'}`);
 });
+
+// Verify if current user is host of specific lobby
+app.get('/auth/verify-host/:lobbyId', (async (req, res) => {
+  const { lobbyId } = req.params;
+  const accessToken = req.cookies.spotify_access_token;
+  
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    // Get current user's Spotify ID
+    const userResponse = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    
+    const spotifyUserId = userResponse.data.id;
+    
+    // Check if this user is the host of the lobby
+    const watcherInfo = trackWatcherManager.getWatcherInfo(lobbyId);
+    const isHost = watcherInfo.exists && watcherInfo.hostSpotifyUserId === spotifyUserId;
+    
+    res.json({ isHost, spotifyUserId });
+  } catch (error) {
+    console.error('Error verifying host status:', error);
+    res.status(500).json({ error: 'Failed to verify host status' });
+  }
+}) as RequestHandler);
