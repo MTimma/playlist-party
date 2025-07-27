@@ -61,6 +61,10 @@ export interface Lobby {
     [playerId: string]: number;
   };
   
+  correctlyGuessedTracks?: {
+    [trackUri: string]: boolean;
+  };
+  
   players: {
     [playerId: string]: Player;
   };

@@ -57,6 +57,9 @@ if (import.meta.env.DEV && !import.meta.env.VITE_USE_FIREBASE_PROD) {
   }
 }
 
+// Note: Firebase offline persistence removed due to deprecated APIs
+// Will be re-implemented with modern persistence APIs in future Firebase upgrade
+
 // Auth functions
 export const signInAnonymouslyIfNeeded = async (): Promise<User> => {
   return new Promise((resolve, reject) => {
@@ -342,12 +345,29 @@ export const initializeGameStateInLobby = async (
     throw new Error('No tracks available for game');
   }
 
+  // Get current lobby to initialize scores for all players
   const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbyDoc = await getDoc(lobbyRef);
+  
+  if (!lobbyDoc.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobbyData = lobbyDoc.data() as Lobby;
+  const playerIds = Object.keys(lobbyData.players || {});
+  
+  // Initialize scores for all current players
+  const initialScores: Record<string, number> = {};
+  playerIds.forEach(playerId => {
+    initialScores[playerId] = 0;
+  });
+
   await updateDoc(lobbyRef, {
     isPlaying: false,
     guessWindowMs: 30000, // 30 seconds
     disableGuessing: false,
-    playerScores: {}
+    playerScores: initialScores,
+    correctlyGuessedTracks: {}
   });
 };
 

@@ -567,7 +567,10 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
   }
 }) as RequestHandler);
 
-// 10. Get track owner for validation (server only)
+// Rate limiting store for guess submissions
+const guessRateLimit = new Map<string, number>();
+
+// 10. Get track owner for validation (server only) - WITH TRANSACTION PROTECTION
 app.post('/api/game/validate-guess', (async (req, res) => {
   console.log('=== Guess Validation Request ===');
   console.log('Request body:', req.body);
@@ -580,89 +583,128 @@ app.post('/api/game/validate-guess', (async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Check if player already guessed for this track
-    console.log('Checking if player already guessed:', playerId);
-    const existingGuessQuery = await db.collection('lobbies').doc(lobbyId)
-      .collection('guesses')
-      .where('playerId', '==', playerId)
-      .where('trackUri', '==', trackUri)
-      .get();
-
-    if (!existingGuessQuery.empty) {
-      console.log('Player already guessed for this track');
-      return res.status(400).json({ error: 'Already guessed for this track' });
+    // SERVER-SIDE RATE LIMITING: Implement per-player guess cooldown (2 seconds)
+    const playerRateKey = `${playerId}:${lobbyId}`;
+    const now = Date.now();
+    const lastGuessTime = guessRateLimit.get(playerRateKey) || 0;
+    
+    if (now - lastGuessTime < 2000) {
+      console.log('Rate limited: Player guessing too frequently');
+      return res.status(429).json({ error: 'Please wait before guessing again' });
     }
-   // Record the guess
-   console.log('Recording guess in database');
-   const guessRef = db.collection('lobbies').doc(lobbyId).collection('guesses').doc();
-   await guessRef.set({
-     playerId,
-     trackUri,
-     guessedOwnerId,
-     createdAt: admin.firestore.FieldValue.serverTimestamp()
-   });
+    
+    guessRateLimit.set(playerRateKey, now);
 
-    console.log('Fetching playlist document for lobby:', lobbyId);
-    // Get playlist collection to find track owner
-    const playlistDoc = await db.collection('playlists').doc(lobbyId).get();
-    
-    if (!playlistDoc.exists) {
-      console.log('Playlist not found for lobby:', lobbyId);
-      return res.status(404).json({ error: 'Playlist not found' });
-    }
+    // Use Firestore transaction to prevent race conditions
+    const result = await db.runTransaction(async (transaction) => {
+      console.log('Starting transaction for guess validation');
+      
+      // Get lobby data first to check solved tracks and find player names
+      const lobbyRef = db.collection('lobbies').doc(lobbyId);
+      const lobbyDoc = await transaction.get(lobbyRef);
+      
+      if (!lobbyDoc.exists) {
+        console.log('Lobby not found:', lobbyId);
+        throw new Error('Lobby not found');
+      }
 
-    const playlistData = playlistDoc.data();
-    const songData = playlistData?.songs?.[trackUri];
-    
-    if (!songData) {
-      console.log('Track not found in playlist:', trackUri);
-      return res.status(404).json({ error: 'Track not found in playlist' });
-    }
+      const lobbyData = lobbyDoc.data();
+      const correctlyGuessedTracks = lobbyData?.correctlyGuessedTracks || {};
+      
+      // Check if track is already solved (first correct guess wins logic)
+      if (correctlyGuessedTracks[trackUri] === true) {
+        console.log('Track already correctly guessed');
+        throw new Error('Track already correctly guessed');
+      }
+      
+      // Check if player already guessed for this track (within transaction)
+      const guessesRef = db.collection('lobbies').doc(lobbyId).collection('guesses');
+      const existingGuessQuery = guessesRef
+        .where('playerId', '==', playerId)
+        .where('trackUri', '==', trackUri);
+      
+      const existingGuesses = await transaction.get(existingGuessQuery);
+      
+      if (!existingGuesses.empty) {
+        console.log('Player already guessed for this track');
+        throw new Error('Already guessed for this track');
+      }
 
-    const realOwnerId = songData.addedBy;
-    const isCorrect = realOwnerId === guessedOwnerId;
-    
-    // Get lobby data to find player names
-    console.log('Fetching lobby data to get player names');
-    const lobbyDoc = await db.collection('lobbies').doc(lobbyId).get();
-    
-    if (!lobbyDoc.exists) {
-      console.log('Lobby not found:', lobbyId);
-      return res.status(404).json({ error: 'Lobby not found' });
-    }
+      // Get playlist data to validate track owner
+      const playlistRef = db.collection('playlists').doc(lobbyId);
+      const playlistDoc = await transaction.get(playlistRef);
+      
+      if (!playlistDoc.exists) {
+        console.log('Playlist not found for lobby:', lobbyId);
+        throw new Error('Playlist not found');
+      }
 
-    const lobbyData = lobbyDoc.data();
-    const players = lobbyData?.players || {};
-    
-    // Find the real owner's name
-    const realOwnerName = players[realOwnerId]?.name || 'Unknown';
-    
-    console.log('Guess validation result:', {
-      trackUri,
-      guessedOwnerId,
-      realOwnerId,
-      realOwnerName,
-      isCorrect
-    });
-    
-    // Update scores in lobby
-    const scoreChange = isCorrect ? 1 : 0;
-    console.log('Updating scores for player:', playerId, 'change:', scoreChange);
-    await db.collection('lobbies').doc(lobbyId).update({
-      [`playerScores.${playerId}`]: admin.firestore.FieldValue.increment(scoreChange)
+      const playlistData = playlistDoc.data();
+      const songData = playlistData?.songs?.[trackUri];
+      
+      if (!songData) {
+        console.log('Track not found in playlist:', trackUri);
+        throw new Error('Track not found in playlist');
+      }
+
+      const realOwnerId = songData.addedBy;
+      const isCorrect = realOwnerId === guessedOwnerId;
+      const players = lobbyData?.players || {};
+      const realOwnerName = players[realOwnerId]?.name || 'Unknown';
+      
+      // ATOMIC OPERATIONS: Record guess and update score in same transaction
+      const guessRef = guessesRef.doc();
+      const guessData = {
+        playerId,
+        trackUri,
+        guessedOwnerId,
+        isCorrect,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      transaction.set(guessRef, guessData);
+      
+      // Calculate score change: +1 for correct, -1 for incorrect
+      const scoreChange = isCorrect ? 1 : -1;
+      
+      // Get current player score to ensure it doesn't go below 0
+      const currentPlayerScores = lobbyData?.playerScores || {};
+      const currentScore = currentPlayerScores[playerId] || 0;
+      const newScore = Math.max(0, currentScore + scoreChange);
+      
+      // Update score atomically
+      transaction.update(lobbyRef, {
+        [`playerScores.${playerId}`]: newScore
+      });
+      
+      // If guess is correct, mark track as solved
+      if (isCorrect) {
+        transaction.update(lobbyRef, {
+          [`correctlyGuessedTracks.${trackUri}`]: true
+        });
+      }
+      
+      console.log('Transaction completed successfully');
+      return {
+        isCorrect,
+        correctOwnerId: realOwnerId,
+        correctOwnerName: realOwnerName,
+        scoreChange
+      };
     });
 
     console.log('Guess validation completed successfully');
-    res.json({ 
-      isCorrect,
-      correctOwnerId: realOwnerId,
-      correctOwnerName: realOwnerName,
-      scoreChange
-    });
+    res.json(result);
     
   } catch (error) {
     console.error('Guess validation error:', error);
-    res.status(500).json({ error: 'Failed to validate guess' });
+    
+    // Clean up rate limit on error
+    const playerRateKey = `${req.body.playerId}:${req.body.lobbyId}`;
+    guessRateLimit.delete(playerRateKey);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Failed to validate guess';
+    res.status(500).json({ error: errorMessage });
   }
 }) as RequestHandler);
 

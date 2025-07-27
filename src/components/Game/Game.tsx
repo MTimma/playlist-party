@@ -23,7 +23,13 @@ export const Game = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [hasGuessed, setHasGuessed] = useState<boolean>(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const trackUri = currentTrack?.uri;
+  const [playerScores, setPlayerScores] = useState<Record<string, number>>({});
+  const [isGuessing, setIsGuessing] = useState(false);
+  const [lastGuessTime, setLastGuessTime] = useState(0);
+  const [currentTrackUri, setCurrentTrackUri] = useState<string | null>(null);
+  const [correctlyGuessedTracks, setCorrectlyGuessedTracks] = useState<Record<string, boolean>>({});
+  const [guessFeedback, setGuessFeedback] = useState<{ type: 'correct' | 'incorrect'; message: string } | null>(null);
+  
   // Ensure the user is authenticated and keep uid in state
   useEffect(() => {
     let isMounted = true;
@@ -52,16 +58,41 @@ export const Game = () => {
     };
   }, []);
 
-  // Check if player has already guessed for the current track
+  // Subscribe to score updates from lobby document with reconciliation
+  useEffect(() => {
+    if (!lobby?.playerScores) {
+      // Initialize empty scores if not available yet
+      setPlayerScores({});
+      return;
+    }
+    
+    // Trust server scores over local state (reconciliation)
+    setPlayerScores(lobby.playerScores);
+    
+    // Log score updates for debugging
+    console.log('Score update received:', lobby.playerScores);
+  }, [lobby?.playerScores]);
+
+  // Subscribe to correctly guessed tracks updates
+  useEffect(() => {
+    if (!lobby?.correctlyGuessedTracks) {
+      setCorrectlyGuessedTracks({});
+      return;
+    }
+    
+    setCorrectlyGuessedTracks(lobby.correctlyGuessedTracks);
+  }, [lobby?.correctlyGuessedTracks]);
+
+  // Check if player has already guessed for the current track - only when track URI changes
   useEffect(() => {
     const checkGuessStatus = async () => {
-      if (!lobbyId || !currentUserId || !trackUri) {
+      if (!lobbyId || !currentUserId || !currentTrackUri) {
         setHasGuessed(false);
         return;
       }
 
       try {
-        const result = await checkPlayerGuess(lobbyId, currentUserId, trackUri);
+        const result = await checkPlayerGuess(lobbyId, currentUserId, currentTrackUri);
         setHasGuessed(result.hasGuessed);
       } catch (error) {
         console.error('Error checking guess status:', error);
@@ -70,7 +101,7 @@ export const Game = () => {
     };
 
     checkGuessStatus();
-  }, [lobbyId, currentUserId, trackUri]);
+  }, [lobbyId, currentUserId, currentTrackUri]);
 
   // Subscribe to lobby (now contains game state AND playback state)
   useEffect(() => {
@@ -93,39 +124,46 @@ export const Game = () => {
         });
         
         if (lobbyData.isPlaying && lobbyData.currentTrack) {
-            // Convert Firebase track data to our Track type
-            const incomingTrackData = lobbyData.currentTrack!; // non-null asserted because of the guard above
-            const incomingUri = incomingTrackData.uri;
-            setCurrentTrack(prev => {
-              // Avoid recreating the Track object if URI did not change
-              if (prev && prev.uri === incomingUri) {
-                return prev;
+          const incomingTrackData = lobbyData.currentTrack;
+          const incomingUri = incomingTrackData.uri;
+          
+          // Only update track state if URI actually changed
+          if (currentTrackUri !== incomingUri) {
+            setCurrentTrackUri(incomingUri);
+            setCurrentTrack({
+              uri: incomingUri,
+              name: incomingTrackData.name,
+              artists: incomingTrackData.artists,
+              duration_ms: incomingTrackData.duration_ms,
+              album: {
+                name: incomingTrackData.album.name,
+                images: incomingTrackData.album.images
               }
-              return {
-               uri: incomingUri,
-               name: incomingTrackData.name,
-               artists: incomingTrackData.artists,
-               duration_ms: incomingTrackData.duration_ms,
-               album: {
-                 name: incomingTrackData.album.name,
-                 images: incomingTrackData.album.images
-               }
-               } as Track;
-             });
+            } as Track);
+            // Reset guess status and feedback when track changes
+            setHasGuessed(false);
+            setGuessFeedback(null);
+          }
+          
           setIsPlaying(true);
           setProgressMs(lobbyData.progressMs || 0);
           setLastUpdated(new Date());
         } else {
           setIsPlaying(false);
-          setCurrentTrack(null);
+          if (currentTrackUri !== null) {
+            setCurrentTrackUri(null);
+            setCurrentTrack(null);
+          }
           setProgressMs(0);
           setLastUpdated(new Date());
+          // Reset feedback when playback stops
+          setGuessFeedback(null);
         }
       }
     });
     
     return () => unsubscribe();
-  }, [lobbyId]);
+  }, [lobbyId, currentTrackUri]);
 
   // Subscribe to playlist collection to get track info
   useEffect(() => {
@@ -144,18 +182,94 @@ export const Game = () => {
     return playlistCollection.songs[trackUri]?.addedBy || null;
   };
 
-  const handleGuess = async (guessedOwnerId: string) => {
+  const handleGuess = async (guessedOwnerId: string): Promise<{ isCorrect: boolean; correctOwnerId?: string; correctOwnerName?: string; scoreChange: number }> => {
     if (!lobbyId || !currentUserId || !currentTrack) {
       throw new Error('Missing required data for guess');
     }
 
+    // Implement debouncing to prevent spam clicking
+    const now = Date.now();
+    if (isGuessing || now - lastGuessTime < 2000) {
+      console.log('Guess blocked: too recent or already guessing');
+      throw new Error('Please wait before guessing again');
+    }
+
+    setIsGuessing(true);
+    setLastGuessTime(now);
+    
     try {
-      const result = await validateGuess(lobbyId, currentUserId, currentTrack.uri, guessedOwnerId);
-      setHasGuessed(true);
-      return result;
-    } catch (error) {
-      console.error('Error submitting guess:', error);
-      throw error;
+      // Retry logic for network failures
+      const maxRetries = 3;
+      let retryCount = 0;
+      
+      while (retryCount < maxRetries) {
+        try {
+          const result = await validateGuess(lobbyId, currentUserId, currentTrack.uri, guessedOwnerId);
+          setHasGuessed(true);
+          
+          // Show feedback to user
+          if (result.isCorrect) {
+            setGuessFeedback({ 
+              type: 'correct', 
+              message: `You guessed correctly! +${result.scoreChange} point${result.scoreChange !== 1 ? 's' : ''}!` 
+            });
+            // Mark track as solved locally (will be reconciled by server)
+            setCorrectlyGuessedTracks(prev => ({
+              ...prev,
+              [currentTrack.uri]: true
+            }));
+          } else {
+            setGuessFeedback({ 
+              type: 'incorrect', 
+              message: `Oh no, that doesn't look correct! ${result.scoreChange} point${Math.abs(result.scoreChange) !== 1 ? 's' : ''}. It was ${result.correctOwnerName || 'someone else'}!` 
+            });
+          }
+          
+          // Clear feedback after 4 seconds
+          setTimeout(() => setGuessFeedback(null), 4000);
+          
+          return result;
+        } catch (error) {
+          retryCount++;
+          console.error(`Guess submission attempt ${retryCount} failed:`, error);
+          
+          // Handle specific business logic errors that shouldn't be retried
+          if (error instanceof Error && (
+            error.message.includes('Track already correctly guessed') ||
+            error.message.includes('Already guessed for this track')
+          )) {
+            // Update local state to reflect the server state
+            if (error.message.includes('Track already correctly guessed')) {
+              setCorrectlyGuessedTracks(prev => ({
+                ...prev,
+                [currentTrack.uri]: true
+              }));
+            }
+            if (error.message.includes('Already guessed for this track')) {
+              setHasGuessed(true);
+            }
+            throw error;
+          }
+          
+          // If it's a network error and we have retries left, wait and retry
+          if (retryCount < maxRetries && (
+            error instanceof TypeError || // Network error
+            (error instanceof Error && error.message.includes('Failed to fetch'))
+          )) {
+            console.log(`Retrying guess submission in ${retryCount * 1000}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+            continue;
+          }
+          
+          // If it's a business logic error or we're out of retries, throw immediately
+          throw error;
+        }
+      }
+      
+      // This should never be reached, but TypeScript requires it
+      throw new Error('Failed to submit guess after maximum retries');
+    } finally {
+      setIsGuessing(false);
     }
   };
 
@@ -205,7 +319,49 @@ export const Game = () => {
         </div>
       </div>
 
+      {/* Score Board */}
+      {lobby?.players && Object.keys(playerScores).length > 0 && (
+        <div className="scoreboard-section">
+          <h3>Scores</h3>
+          <div className="scores-grid">
+            {Object.entries(lobby.players)
+              .map(([playerId, player]) => ({
+                playerId,
+                playerName: player.name,
+                score: playerScores[playerId] || 0,
+                isCurrentPlayer: playerId === currentUserId,
+                isHost: player.isHost
+              }))
+              .sort((a, b) => {
+                // Primary sort: by score (descending)
+                if (a.score !== b.score) {
+                  return b.score - a.score;
+                }
+                // Secondary sort: by name (ascending, alphabetical)
+                return a.playerName.localeCompare(b.playerName);
+              })
+              .map(({ playerId, playerName, score, isCurrentPlayer, isHost }) => (
+                <div 
+                  key={playerId} 
+                  className={`score-item ${isCurrentPlayer ? 'current-player' : ''} ${isHost ? 'host' : ''}`}
+                >
+                  <span className="player-name">
+                    {playerName} {isCurrentPlayer && '(You)'} {isHost && '(Host)'} 
+                  </span>
+                  <span className="score">{score}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       <div className="game-content">
+        {guessFeedback && (
+          <div className={`guess-feedback ${guessFeedback.type}`}>
+            {guessFeedback.message}
+          </div>
+        )}
+        
         {isPlaying && currentTrack ? (
           <>
             <TrackInfo 
@@ -220,12 +376,20 @@ export const Game = () => {
               const trackOwner = getTrackOwner(currentTrack.uri);
               const isTrackOwner = trackOwner === currentUserId;
               const guessingDisabled = lobby?.disableGuessing === true;
+              const isTrackSolved = correctlyGuessedTracks[currentTrack.uri] === true;
               
               // Show GuessButtons if all conditions are met
-              if (inPlaylist && !guessingDisabled && !isTrackOwner && !hasGuessed && lobby?.players) {
+              if (inPlaylist && !guessingDisabled && !isTrackOwner && !hasGuessed && !isTrackSolved && lobby?.players) {
+                // Sort players alphabetically for consistent button order
+                const sortedPlayers = Object.fromEntries(
+                  Object.entries(lobby.players).sort(([, a], [, b]) => 
+                    a.name.localeCompare(b.name)
+                  )
+                );
+                
                 return (
                   <GuessButtons
-                    players={lobby.players}
+                    players={sortedPlayers}
                     excludedPlayerId={currentUserId || ''}
                     onGuess={handleGuess}
                   />
@@ -239,7 +403,8 @@ export const Game = () => {
                     <h3>Who added this song?</h3>
                     <p>🎵 {currentTrack.name} by {currentTrack.artists.map(a => a.name).join(', ')}</p>
                     {isTrackOwner && <p>You added this song!</p>}
-                    {hasGuessed && <p>You already guessed for this track.</p>}
+                    {hasGuessed && <p>✅ You already guessed for this track.</p>}
+                    {isTrackSolved && <p className="solved-track-message">🎯 This track has been correctly guessed!</p>}
                     {guessingDisabled && <p>Guessing is currently disabled.</p>}
                   </div>
                 );

@@ -263,7 +263,7 @@ In Game.tsx compare the new currentTrack.uri with the previous one and call setC
 Alternatively, cache the “has guessed” flag in component state and refresh it only when the song changes.
 Implementing any of those will collapse the extra round-trip traffic and remove the “too many requests” issue.
 
-4. 
+4. DONE
 there is something buggy with song progress, it jumps up by 2 and then goes down by one second, so if it was 0:01, it would be 0:03 millisecond nad then changes to 0:02
 
 this was seeen first when testing parallel lobbies
