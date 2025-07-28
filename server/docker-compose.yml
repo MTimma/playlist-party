@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: music-game-api
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    environment:
+      - NODE_ENV=development
+      - PORT=8888
+      - FRONTEND_URL=http://localhost:5173
+      - WATCHER_MAX_CONCURRENCY=500
+      - WATCHER_POLL_MS=1000
+      - WATCHER_DEFAULT_BACKOFF_MS=15000
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - ./src:/app/src
+      - ./dist:/app/dist
