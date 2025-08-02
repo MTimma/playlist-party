@@ -6,9 +6,14 @@ import './PlaylistStats.css';
 interface PlaylistStatsProps {
   lobbyId: string;
   onStartGame: () => void;
+  /**
+   * Indicates whether every player in the lobby has marked themselves ready.
+   * This comes from the parent component (Lobby) which already tracks readiness.
+   */
+  allPlayersReady: boolean;
 }
 
-export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
+export const PlaylistStats = ({ lobbyId, onStartGame, allPlayersReady }: PlaylistStatsProps) => {
   const [playlistData, setPlaylistData] = useState<PlaylistCollection | null>(null);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +46,11 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
 
   const canStartGame = () => {
     if (!playlistData) return false;
-    return playlistData.stats.totalSongs >= 2 && playlistData.stats.playersWithSongs >= 2;
+    return (
+      playlistData.stats.totalSongs >= 2 &&
+      playlistData.stats.playersWithSongs >= 2 &&
+      allPlayersReady
+    );
   };
 
     // const canStartGame = () => {
@@ -115,9 +124,10 @@ export const PlaylistStats = ({ lobbyId, onStartGame }: PlaylistStatsProps) => {
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
             </svg>
             <span>
-              Need at least 2 songs from 2 players 
+              Need at least 2 songs from 2 players and all players ready
               {playlistData.stats.totalSongs < 2 && ` (${2 - playlistData.stats.totalSongs} more songs needed)`}
               {playlistData.stats.playersWithSongs < 2 && ` (${2 - playlistData.stats.playersWithSongs} more players need to add songs)`}
+              {!allPlayersReady && ' (waiting for players to be ready)'}
             </span>
           </div>
         )}

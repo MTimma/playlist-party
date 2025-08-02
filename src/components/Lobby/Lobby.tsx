@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { subscribeLobby, signInAnonymouslyIfNeeded, leaveLobby, updateLobbyStatus, createPlaylistCollection, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
+import { useParams, useNavigate } from 'react-router-dom';
+import { subscribeLobby, signInAnonymouslyIfNeeded, leaveLobby, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
 import { PlayerList } from './PlayerList';
 import { ReadyButton } from '../ReadyButton/ReadyButton';
 import { PlaylistNameDialog } from '../PlaylistNameDialog/PlaylistNameDialog';
@@ -86,21 +86,6 @@ export const Lobby = () => {
     }
   };
 
-  const handleStartSongCollection = async () => {
-    if (!lobbyId || !lobby) return;
-    
-    try {
-      // Create a playlist collection document
-      await createPlaylistCollection(lobbyId, `playlist_${lobbyId}`);
-      
-      // Update lobby status to start song collection
-      await updateLobbyStatus(lobbyId, 'collecting_songs');
-    } catch (error) {
-      console.error('Error starting song collection:', error);
-      setError('Failed to start song collection. Please try again.');
-    }
-  };
-
   const handleToggleReady = async () => {
     if (!lobbyId) return;
     
@@ -159,11 +144,6 @@ export const Lobby = () => {
       default:
         return '';
     }
-  };
-
-  const canStartSongCollection = () => {
-    if (!lobby || !isHost) return false;
-    return lobby.status === 'waiting' && Object.keys(lobby.players).length >= 2;
   };
 
   const getCurrentPlayer = () => {
@@ -246,18 +226,6 @@ export const Lobby = () => {
                     </>
                   )}
                 </button>
-                
-                {canStartSongCollection() && (
-                  <button
-                    onClick={handleStartSongCollection}
-                    className="action-btn primary"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                    </svg>
-                    Start Song Collection
-                  </button>
-                )}
               </div>
             ) : (
               <button
@@ -279,31 +247,6 @@ export const Lobby = () => {
           currentUserId={currentUserId}
         />
 
-        {isHost && lobby.status === 'waiting' && Object.keys(lobby.players).length < 2 && (
-          <div className="waiting-notice">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
-            <div>
-              <h3>Waiting for Players</h3>
-              <p>You need at least 2 players to start the game. Share the invite link with your friends!</p>
-              <div className="share-link-container">
-                <input
-                  type="text"
-                  value={shareLink}
-                  readOnly
-                  className="share-link-input"
-                />
-                <button
-                  onClick={handleCopyShareLink}
-                  className="copy-btn"
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {lobby.status === 'collecting_songs' && (
           <div className="collection-phase">
@@ -346,6 +289,7 @@ export const Lobby = () => {
               <PlaylistStats 
                 lobbyId={lobbyId!}
                 onStartGame={handleStartGameRequest}
+                allPlayersReady={getAllPlayersReady()}
               />
             )}
             

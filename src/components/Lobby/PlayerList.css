@@ -8,9 +8,10 @@
 
 .player-list-header {
   display: flex;
-  justify-content: space-between;
+  gap: 1rem;
   align-items: center;
   margin-bottom: 1.5rem;
+  width: fit-content;
 }
 
 .player-list-title {
@@ -181,17 +182,29 @@
   flex-shrink: 0;
 }
 
-.ready-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #10b981;
-}
-
+.ready-indicator,
 .not-ready-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.25rem; /* spacing between icon and label */
+}
+
+/* Keep icon color consistent with previous design */
+.not-ready-indicator {
+  color: #6b7280;
+}
+
+.status-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ready-indicator .status-label {
+  color: #10b981;
+}
+
+.not-ready-indicator .status-label {
   color: #6b7280;
 }
 

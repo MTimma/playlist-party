@@ -12,6 +12,7 @@ import {
   where,
   deleteDoc,
   increment,
+  runTransaction,
   connectFirestoreEmulator
 } from 'firebase/firestore';
 import { 
@@ -104,7 +105,7 @@ export const createLobby = async (
     id: lobbyId,
     hostFirebaseUid: user.uid,
     hostSpotifyUserId,
-    status: 'waiting',
+    status: 'collecting_songs',
     createdAt: new Date(),
     maxPlayers,
     players: {
@@ -116,6 +117,7 @@ export const createLobby = async (
     ...lobby,
     createdAt: serverTimestamp()
   });
+  await createPlaylistCollection(lobbyId, `playlist_${lobbyId}`);
   
   return lobbyId;
 };
@@ -132,7 +134,7 @@ export const joinLobby = async (lobbyId: string, playerName: string): Promise<bo
     
     const lobby = lobbyDoc.data() as Lobby;
     
-    if (lobby.status !== 'waiting') {
+    if (lobby.status !== 'waiting' && lobby.status !== 'collecting_songs') {
       throw new Error('Lobby is not accepting new players');
     }
     
@@ -580,19 +582,39 @@ export const addTrackToPlaylist = async (
   addedBy: string, 
   trackInfo: Track
 ): Promise<void> => {
-  const collectionRef = doc(db, 'playlists', lobbyId);
-  
-  await updateDoc(collectionRef, {
-    [`songs.${trackUri}`]: {
-      addedBy,
-      trackInfo,
-      addedAt: serverTimestamp()
+  const playlistRef = doc(db, 'playlists', lobbyId);
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+
+  await runTransaction(db, async (tx) => {
+    // 1. Guard against duplicate songs
+    const playlistSnap = await tx.get(playlistRef);
+    const playlistData = playlistSnap.data() as PlaylistCollection | undefined;
+    if (playlistData?.songs?.[trackUri]) {
+      throw new Error('Track already in playlist');
     }
+
+    // 2. Determine if this is the player's first song (for stats)
+    const lobbySnap = await tx.get(lobbyRef);
+    const lobbyData = lobbySnap.data() as Lobby | undefined;
+    const isFirstSong = !(lobbyData?.players?.[addedBy]?.hasAddedSongs);
+
+    // 3. Write song entry
+    tx.update(playlistRef, {
+      [`songs.${trackUri}`]: {
+        addedBy,
+        trackInfo,
+        addedAt: serverTimestamp(),
+      },
+      'stats.totalSongs': increment(1),
+      ...(isFirstSong ? { 'stats.playersWithSongs': increment(1) } : {}),
+    });
+
+    // 4. Mark player as having added songs
+    tx.update(lobbyRef, {
+      [`players.${addedBy}.hasAddedSongs`]: true,
+    });
   });
-  
-  // Update stats atomically
-  await updatePlaylistStats(lobbyId, addedBy);
-};
+}
 
 export const subscribePlaylistCollection = (
   lobbyId: string, 

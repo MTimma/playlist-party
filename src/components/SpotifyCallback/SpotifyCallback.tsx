@@ -10,7 +10,6 @@ const SpotifyCallback = () => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (!code) {
-      setError('Missing code parameter');
       setTimeout(() => navigate('/'), 3000);
       return;
     }

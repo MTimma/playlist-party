@@ -89,7 +89,7 @@ export const CreateLobby = () => {
         <div className="create-lobby-card">
           <h1 className="create-lobby-title">Create Game Lobby</h1>
           <p className="create-lobby-subtitle">
-            You need to connect your Spotify account to host a game
+            You need a Premium Spotify account to host a game
           </p>
           <button className="spotify-login-btn" onClick={handleSpotifyLogin}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -97,6 +97,9 @@ export const CreateLobby = () => {
             </svg>
             Connect Spotify Account
           </button>
+          <p className="create-lobby-subtitle">
+            Powered by Spotify
+          </p>
         </div>
       </div>
     );

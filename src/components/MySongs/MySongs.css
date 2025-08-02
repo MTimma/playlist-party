@@ -243,12 +243,4 @@
   .song-artist {
     font-size: 0.7rem;
   }
-  
-  .status-text {
-    display: none;
-  }
-  
-  .rejection-reason {
-    display: none;
-  }
 } 
