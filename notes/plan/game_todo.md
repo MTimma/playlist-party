@@ -319,43 +319,111 @@ The goal is to improve user experience post-OAuth by returning the player **dire
 
 --- 6. in game for host need buttons to end the game. Then show to all players the result score of the game.
 ### Analysis & Implementation Plan
+Based on my analysis, here's a comprehensive breakdown of what's needed for the end game feature:
+Create POST /api/game/:lobbyId/end endpoint to handle game ending with host authentication, status update to 'finished', final scores capture, and watcher cleanup
+Create game_results Firestore collection to store historical game results with lobbyId, players, finalScores, winnerId, endedAt, and duration
+Add 'End Game' button in Game.tsx for host with confirmation dialog and handleEndGame function
+Implement automatic game ending when all tracks in playlist are correctly guessed
+Create EndGameSummary component to display final scores, winner announcement, and play again options
+Add react-canvas-confetti library and implement winner celebration animation
+Delete lobby record on game end to stop watcher polling and clean up resources
+Implement game results retrieval on URL opening to show past game results
+Analysis: End Game Feature Requirements
+Based on my thorough code analysis, here's what needs to be implemented for the end game feature:
+Current State
+The game has a 'finished' status defined in types but it's not being used
+There's a 'terminated_by_host' status that shows a simple message but doesn't preserve game results
+The scoreboard is already tracking scores in real-time (playerScores in lobby document)
+The game tracks which songs have been correctly guessed (correctlyGuessedTracks)
+No end game button exists for the host
+No celebration/confetti animation for winners
+No historical game results storage
+Required Features
+*Create POST /api/game/:lobbyId/end endpoint to handle game ending with host authentication, status update to 'finished', final scores capture, and watcher cleanup
+Create game_results Firestore collection to store historical game results with lobbyId, players, finalScores, winnerId, endedAt, and duration
+Add 'End Game' button in Game.tsx for host with confirmation dialog and handleEndGame function
+Implement automatic game ending when all tracks in playlist are correctly guessed
+Create EndGameSummary component to display final scores, winner announcement, and play again options
+Add react-canvas-confetti library and implement winner celebration animation
+Delete lobby record on game end to stop watcher polling and clean up resources
+Implement game results retrieval on URL opening to show past game results
 
-1. Current situation  
-   • `Game.tsx` already renders a live scoreboard but lacks an *End Game* control.  
-   • There is a UI path for `lobby.status === 'terminated_by_host'`, but **no way to set that status**.  
+1. Backend End Game Endpoint
+Create POST /api/game/:lobbyId/end endpoint that:
+Validates the caller is the host (using Firebase auth)
+Updates lobby status to 'finished'
+Captures final scores and winner information
+Stops the track watcher to prevent Spotify polling
+Creates a game result record for historical tracking
+2. Game Results Database Table
+New Firestore collection: game_results
+Schema:
+interface GameResult {
+    id: string;
+    lobbyId: string;
+    hostId: string;
+    endedAt: Timestamp;
+    duration: number; // in seconds
+    finalScores: Record<string, number>;
+    players: Record<string, { name: string; score: number }>;
+    winnerId: string;
+    winnerName: string;
+    totalTracksGuessed: number;
+    playlistId?: string;
+  }
+3. Frontend End Game Button
+Only visible to the host
+Positioned in the game header or control area
+Includes confirmation dialog to prevent accidental clicks
+Triggers the end game API call
+4. Auto-End When All Songs Guessed
+Monitor correctlyGuessedTracks length vs total playlist songs
+Automatically trigger game end when all tracks are guessed
+No need for host intervention in this case
+5. End Game Summary Component
+New component: EndGameSummary
+Displays:
+Final scoreboard with winner highlighted
+Confetti animation for the winner
+Game statistics (duration, tracks guessed, etc.)
+"Play Again" button for host
+"Home" button for all players
+6. Confetti Animation
+Install react-canvas-confetti package
+Trigger on game end when showing the winner
+Customizable colors and duration
+7. Lobby Cleanup
+Delete the lobby document after creating the game result
+This automatically stops the watcher polling
+Clear localStorage references
+8. Results Persistence & Retrieval
+When opening a game URL after it's finished:
+Check if lobby exists
+If not, check game_results collection
+Display the final results if found
+Show "Game not found" if neither exists
+Implementation Considerations
+Security
+Only host can end the game manually
+Validate all score calculations server-side
+Use Firestore transactions to prevent race conditions
+Performance
+The track watcher cleanup is critical to stop unnecessary Spotify API calls
+Consider batching the final cleanup operations
+Use proper indexes on game_results collection
+User Experience
+Clear visual feedback when game ends
+Smooth transition to results screen
+Prevent accidental game ending with confirmation
+Handle network failures gracefully
+Edge Cases to Handle
+Host disconnection during game end
+Players still trying to guess during transition
+Multiple end game requests (double-click protection)
+Game ending with no correct guesses
+Tie scenarios for winner determination
+This implementation will provide a complete end game flow with proper cleanup, historical tracking, and an engaging celebration for the winner. 
 
-2. Backend contract  
-   a) Add `POST /api/game/:lobbyId/end` which:  
-      – Validates caller is the host.  
-      – Writes `{ status: 'ended', endedAt: now, finalScores: lobby.playerScores }` to the lobby doc.  
-      – Optionally archives guesses/rounds to `/rounds` sub-collection.  
-   b) Security rule update: only host UID may write `status: 'ended'`.
-
-3. Front-end changes  
-   a) **UI** — inside `Game.tsx`, if `isCurrentPlayerHost` render:
-   ```tsx
-   <button className="end-game-btn" onClick={handleEndGame}>End Game</button>
-   ```
-   b) `handleEndGame`:
-   ```ts
-   async function handleEndGame() {
-     if(!window.confirm('End the game for all players?')) return;
-     await fetch(`${VITE_BACKEND_URL}/api/game/${lobbyId}/end`, {
-       method: 'POST',
-       credentials: 'include'
-     });
-   }
-   ```
-   c) **Result screen** — subscribe to lobby; when `status === 'ended'` render:<br/>• Final sorted scoreboard<br/>• “Play again” (for host) / “Home” (for players).
-
-4. New component (UX separation)  
-   • Create `components/EndGameSummary/` containing `EndGameSummary.tsx` + `EndGameSummary.css` to show the final table, confetti, etc.  
-   • Keep to the “one folder per component” convention.  
-   • Re-use existing `playerScores` state to avoid double reads.
-
-5. State clean-up  
-   • On ending the game the host should stop the track watcher and clear `isPlaying`.  
-   • Clients should `localStorage.removeItem('activeLobbyId');` so a new OAuth login does not resurrect an old game.
 
 #### “Underwater Stones”
 • Race conditions: two hosts (edge-case) click end simultaneously ⇒ use Firestore `runTransaction`/backend mutex.  
@@ -364,5 +432,3 @@ The goal is to improve user experience post-OAuth by returning the player **dire
 • Performance: big lobbies could have thousands of players → paginate or virtualise the final table.  
 • Security: backend must verify the caller’s auth cookie and host role before writing the end marker — **never** trust the button alone.  
 • Mobile UX: place the end-game button in a confirmation dialog to prevent accidental taps.
-
-> **Note**: some function names/endpoints (`/api/me/active-lobby`, `/api/game/:lobbyId/end`) are proposals based on existing patterns — double-check your backend before implementing.
