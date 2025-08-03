@@ -97,10 +97,14 @@ export const getSpotifyUser = async (): Promise<SpotifyUser> => {
 };
 
 // End game (host only)
-export const endGame = async (lobbyId: string): Promise<void> => {
+export const endGame = async (lobbyId: string, autoEnd: boolean = false): Promise<void> => {
   const response = await fetch(`${BACKEND_URL}/api/game/${lobbyId}/end`, {
     method: 'POST',
-    credentials: 'include'
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ autoEnd })
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

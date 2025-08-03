@@ -757,6 +757,7 @@ app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
 app.post('/api/game/:lobbyId/end', (async (req, res) => {
   try {
     const { lobbyId } = req.params;
+    const { autoEnd } = req.body; // Flag to indicate if this is an auto-end due to all tracks guessed
 
     // Fetch lobby document
     const lobbyRef = db.collection('lobbies').doc(lobbyId);
@@ -767,10 +768,26 @@ app.post('/api/game/:lobbyId/end', (async (req, res) => {
 
     const lobbyData = lobbySnap.data() as any;
 
-    // Basic host validation – relies on Firebase auth cookies (for production use stricter checks)
-    const callerUid = (req as any).user?.uid || null; // assuming auth middleware sets req.user
-    if (callerUid && lobbyData.hostFirebaseUid && callerUid !== lobbyData.hostFirebaseUid) {
-      return res.status(403).json({ error: 'Only the host can end the game' });
+    // For auto-end, verify all tracks are guessed instead of host check
+    if (autoEnd) {
+      // Get playlist to check total tracks
+      const playlistRef = db.collection('playlists').doc(lobbyId);
+      const playlistSnap = await playlistRef.get();
+      if (playlistSnap.exists) {
+        const playlistData = playlistSnap.data();
+        const totalTracks = Object.keys(playlistData?.songs || {}).length;
+        const guessedTracks = Object.keys(lobbyData.correctlyGuessedTracks || {}).length;
+        
+        if (totalTracks === 0 || guessedTracks !== totalTracks) {
+          return res.status(400).json({ error: 'Not all tracks have been guessed' });
+        }
+      }
+    } else {
+      // Manual end - verify host
+      const callerUid = (req as any).user?.uid || null; // assuming auth middleware sets req.user
+      if (callerUid && lobbyData.hostFirebaseUid && callerUid !== lobbyData.hostFirebaseUid) {
+        return res.status(403).json({ error: 'Only the host can end the game' });
+      }
     }
 
     // Determine winner & stats
@@ -790,7 +807,8 @@ app.post('/api/game/:lobbyId/end', (async (req, res) => {
       finalScores: scores,
       players: lobbyData.players || {},
       winnerId,
-      playlistId: lobbyData.playlistId || null
+      playlistId: lobbyData.playlistId || null,
+      autoEnded: autoEnd || false
     };
 
     // Write game result BEFORE deleting lobby (to keep data)

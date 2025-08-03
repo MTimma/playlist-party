@@ -8,7 +8,7 @@ interface Props {
 }
 
 export const EndGameSummary: React.FC<Props> = ({ result, currentUserId }) => {
-  const { finalScores, players, winnerId } = result;
+  const { finalScores, players, winnerId, autoEnded } = result;
 
   const sorted = Object.entries(finalScores)
     .map(([pid, score]) => ({
@@ -21,6 +21,9 @@ export const EndGameSummary: React.FC<Props> = ({ result, currentUserId }) => {
   return (
     <div className="endgame-summary">
       <h2>Game Over!</h2>
+      {autoEnded && (
+        <p className="auto-end-message">🎉 All songs have been correctly guessed!</p>
+      )}
       {winnerId && (
         <div className="winner-announcement">
           🏆 Winner: {players?.[winnerId]?.name || 'Unknown'}

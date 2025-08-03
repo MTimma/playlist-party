@@ -147,4 +147,5 @@ export interface GameResult {
   };
   winnerId: string | null;
   playlistId?: string | null;
+  autoEnded?: boolean;
 } 

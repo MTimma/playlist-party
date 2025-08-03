@@ -86,6 +86,24 @@ export const Game = () => {
     setCorrectlyGuessedTracks(lobby.correctlyGuessedTracks);
   }, [lobby?.correctlyGuessedTracks]);
 
+  // Auto-end game when all tracks are guessed
+  useEffect(() => {
+    if (!lobby || !playlistCollection || !lobbyId) return;
+    
+    // Only host should trigger auto-end to avoid race conditions
+    if (lobby.hostFirebaseUid !== currentUserId) return;
+    
+    const totalTracks = Object.keys(playlistCollection.songs || {}).length;
+    const guessedTracks = Object.keys(correctlyGuessedTracks).length;
+    
+    if (totalTracks > 0 && guessedTracks === totalTracks) {
+      console.log('All tracks guessed! Auto-ending game...');
+      endGame(lobbyId, true).catch(err => {
+        console.error('Failed to auto-end game:', err);
+      });
+    }
+  }, [lobby, playlistCollection, correctlyGuessedTracks, lobbyId, currentUserId]);
+
   // Check if player has already guessed for the current track - only when track URI changes
   useEffect(() => {
     const checkGuessStatus = async () => {

@@ -33,3 +33,9 @@
 .score-item.me {
   border: 1px solid #4caf50;
 }
+
+.auto-end-message {
+  font-size: 1.1rem;
+  color: #4caf50;
+  margin-bottom: 1rem;
+}
