@@ -241,7 +241,7 @@ export const Game = () => {
           } else {
             setGuessFeedback({ 
               type: 'incorrect', 
-              message: `Oh no, that doesn't look correct! ${result.scoreChange} point${Math.abs(result.scoreChange) !== 1 ? 's' : ''}. It was ${result.correctOwnerName || 'someone else'}!` 
+              message: `Oh no, that doesn't look correct! ${result.scoreChange} point${Math.abs(result.scoreChange) !== 1 ? 's' : ''}!` 
             });
           }
           
