@@ -432,3 +432,4 @@ This implementation will provide a complete end game flow with proper cleanup, h
 • Performance: big lobbies could have thousands of players → paginate or virtualise the final table.  
 • Security: backend must verify the caller’s auth cookie and host role before writing the end marker — **never** trust the button alone.  
 • Mobile UX: place the end-game button in a confirmation dialog to prevent accidental taps.
+
