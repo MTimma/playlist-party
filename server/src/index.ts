@@ -753,6 +753,62 @@ app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
   }
 }) as RequestHandler);
 
+// 11. End game and archive results
+app.post('/api/game/:lobbyId/end', (async (req, res) => {
+  try {
+    const { lobbyId } = req.params;
+
+    // Fetch lobby document
+    const lobbyRef = db.collection('lobbies').doc(lobbyId);
+    const lobbySnap = await lobbyRef.get();
+    if (!lobbySnap.exists) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+
+    const lobbyData = lobbySnap.data() as any;
+
+    // Basic host validation – relies on Firebase auth cookies (for production use stricter checks)
+    const callerUid = (req as any).user?.uid || null; // assuming auth middleware sets req.user
+    if (callerUid && lobbyData.hostFirebaseUid && callerUid !== lobbyData.hostFirebaseUid) {
+      return res.status(403).json({ error: 'Only the host can end the game' });
+    }
+
+    // Determine winner & stats
+    const scores: Record<string, number> = lobbyData.playerScores || {};
+    let winnerId: string | null = null;
+    let maxScore = -Infinity;
+    for (const [pid, sc] of Object.entries(scores)) {
+      if (sc > maxScore) { maxScore = sc as number; winnerId = pid; }
+    }
+
+    const resultDoc = {
+      lobbyId,
+      hostId: lobbyData.hostFirebaseUid,
+      endedAt: admin.firestore.FieldValue.serverTimestamp(),
+      durationSec: lobbyData.startedAt && lobbyData.createdAt ?
+        Math.floor(((lobbyData.startedAt?.toDate?.() || new Date()).getTime() - (lobbyData.createdAt?.toDate?.() || new Date()).getTime())/1000) : null,
+      finalScores: scores,
+      players: lobbyData.players || {},
+      winnerId,
+      playlistId: lobbyData.playlistId || null
+    };
+
+    // Write game result BEFORE deleting lobby (to keep data)
+    await db.collection('game_results').doc(lobbyId).set(resultDoc);
+
+    // Stop any active watcher
+    trackWatcherManager.stopWatcher(lobbyId);
+
+    // Delete lobby to clean up and stop snapshot updates
+    await lobbyRef.delete();
+
+    res.json({ success: true, result: resultDoc });
+  } catch (error) {
+    console.error('Error ending game:', error);
+    res.status(500).json({ error: 'Failed to end game' });
+  }
+}) as RequestHandler);
+
 // NEW: Watcher management endpoints for monitoring
 app.get('/api/watchers/status', ((_req, res) => {
   res.json({

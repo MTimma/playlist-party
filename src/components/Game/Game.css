@@ -500,3 +500,18 @@
   opacity: 0.5;
   cursor: not-allowed;
 } 
+
+/* End game button */
+.end-game-btn {
+  margin-left: 1rem;
+  padding: 0.4rem 0.8rem;
+  background: #ff5252;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.end-game-btn:hover {
+  background: #ff1744;
+} 

@@ -729,3 +729,22 @@ export const verifyHostStatus = async (lobbyId: string): Promise<boolean> => {
     return false;
   }
 };
+
+export const subscribeGameResult = (
+  lobbyId: string,
+  callback: (result: import('../types/types').GameResult | null) => void
+) => {
+  const resultRef = doc(db, 'game_results', lobbyId);
+  return onSnapshot(resultRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const result: import('../types/types').GameResult = {
+        ...data,
+        endedAt: data.endedAt?.toDate?.() || new Date()
+      } as any;
+      callback(result);
+    } else {
+      callback(null);
+    }
+  });
+};
