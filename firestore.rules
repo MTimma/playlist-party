@@ -137,5 +137,16 @@ service cloud.firestore {
       // Cloud Functions should handle guess validation and scoring
       // No direct updates allowed from clients
     }
+
+    // === Game results (final scoreboard) ===
+    match /game_results/{lobbyId} {
+      // Any authenticated user can read a finished game's results so that
+      // all former players may display the final scoreboard even after the
+      // lobby document has been deleted.
+      allow read: if request.auth != null;
+      // Clients must never write to this collection – only the trusted backend
+      // (using the Admin SDK) may create documents.
+      allow write: if false;
+    }
   }
 } 
