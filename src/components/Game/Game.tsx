@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { 
   subscribePlaylistCollection, 
@@ -32,6 +32,8 @@ export const Game = () => {
   const [correctlyGuessedTracks, setCorrectlyGuessedTracks] = useState<Record<string, boolean>>({});
   const [guessFeedback, setGuessFeedback] = useState<{ type: 'correct' | 'incorrect'; message: string } | null>(null);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
+  // Hold unsubscribe for playlist listener so we can detach early
+  const playlistUnsubRef = useRef<() => void>();
   
   // Ensure the user is authenticated and keep uid in state
   useEffect(() => {
@@ -127,74 +129,22 @@ export const Game = () => {
   // Subscribe to lobby (now contains game state AND playback state)
   useEffect(() => {
     if (!lobbyId) return;
-    
-    const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
-      setLobby(lobbyData);
-      
-      if (lobbyData && lobbyData.status === 'in_progress') {
-        setLoading(false);
-      }
-      
-      // Handle playback state from Firebase real-time updates
-      if (lobbyData) {
-        console.log('Firebase playback update:', {
-          isPlaying: lobbyData.isPlaying,
-          hasCurrentTrack: !!lobbyData.currentTrack,
-          trackName: lobbyData.currentTrack?.name,
-          progressMs: lobbyData.progressMs
-        });
-        
-        if (lobbyData.isPlaying && lobbyData.currentTrack) {
-          const incomingTrackData = lobbyData.currentTrack;
-          const incomingUri = incomingTrackData.uri;
-          
-          // Only update track state if URI actually changed
-          if (currentTrackUri !== incomingUri) {
-            setCurrentTrackUri(incomingUri);
-            setCurrentTrack({
-              uri: incomingUri,
-              name: incomingTrackData.name,
-              artists: incomingTrackData.artists,
-              duration_ms: incomingTrackData.duration_ms,
-              album: {
-                name: incomingTrackData.album.name,
-                images: incomingTrackData.album.images
-              }
-            } as Track);
-            // Reset guess status and feedback when track changes
-            setHasGuessed(false);
-            setGuessFeedback(null);
-          }
-          
-          setIsPlaying(true);
-          setProgressMs(lobbyData.progressMs || 0);
-          setLastUpdated(new Date());
-        } else {
-          setIsPlaying(false);
-          if (currentTrackUri !== null) {
-            setCurrentTrackUri(null);
-            setCurrentTrack(null);
-          }
-          setProgressMs(0);
-          setLastUpdated(new Date());
-          // Reset feedback when playback stops
-          setGuessFeedback(null);
-        }
-      }
-    });
-    
-    return () => unsubscribe();
-  }, [lobbyId, currentTrackUri]);
+    // Detach existing listener first if any (lobby restart edge-case)
+    if (playlistUnsubRef.current) {
+      playlistUnsubRef.current();
+      playlistUnsubRef.current = undefined;
+    }
 
-  // Subscribe to playlist collection to get track info
-  useEffect(() => {
-    if (!lobbyId) return;
-    
-    const unsubscribe = subscribePlaylistCollection(lobbyId, (collection) => {
+    playlistUnsubRef.current = subscribePlaylistCollection(lobbyId, (collection) => {
       setPlaylistCollection(collection);
     });
-    
-    return () => unsubscribe();
+
+    return () => {
+      if (playlistUnsubRef.current) {
+        playlistUnsubRef.current();
+        playlistUnsubRef.current = undefined;
+      }
+    };
   }, [lobbyId]);
 
   // Subscribe to game result document (after lobby deletion)
