@@ -7,7 +7,7 @@ import {
   signInAnonymouslyIfNeeded,
   subscribeGameResult
 } from '../../services/firebase';
-import { validateGuess, checkPlayerGuess, endGame } from '../../services/backend';
+import { validateGuess, checkPlayerGuess, createGameResult, deleteLobbyClient } from '../../services/backend';
 import { TrackInfo } from '../TrackInfo/TrackInfo';
 import { GuessButtons } from '../GuessButtons/GuessButtons';
 import { EndGameSummary } from '../EndGameSummary/EndGameSummary';
@@ -100,9 +100,11 @@ export const Game = () => {
     
     if (totalTracks > 0 && guessedTracks === totalTracks) {
       console.log('All tracks guessed! Auto-ending game...');
-      endGame(lobbyId, true).catch(err => {
-        console.error('Failed to auto-end game:', err);
-      });
+      createGameResult(lobbyId, true)
+        .then(()=> deleteLobbyClient(lobbyId))
+        .catch(err=>{
+          console.error('Failed to auto-end game:', err);
+        });
     }
   }, [lobby, playlistCollection, correctlyGuessedTracks, lobbyId, currentUserId]);
 
@@ -213,7 +215,8 @@ export const Game = () => {
     if (!lobbyId) return;
     if (!window.confirm('End the game for all players?')) return;
     try {
-      await endGame(lobbyId);
+      await createGameResult(lobbyId);
+      await deleteLobbyClient(lobbyId);
     } catch (err: any) {
       alert(err.message || 'Failed to end game');
     }

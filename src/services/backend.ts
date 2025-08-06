@@ -1,5 +1,7 @@
 import type { SpotifyUser } from '../types/types';
 import { getAuth } from 'firebase/auth';
+import { deleteDoc, doc } from 'firebase/firestore';
+import { db } from './firebase';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -115,4 +117,28 @@ export const endGame = async (lobbyId: string, autoEnd: boolean = false): Promis
     const error = await response.json().catch(() => ({}));
     throw new Error(error.error || 'Failed to end game');
   }
+};
+
+// Host creates game result on server
+export const createGameResult = async (lobbyId: string, autoEnd: boolean = false): Promise<void> => {
+  const auth = getAuth();
+  const idToken = await auth.currentUser?.getIdToken() || '';
+
+  const resp = await fetch(`${BACKEND_URL}/api/game/${lobbyId}/result`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ autoEnd })
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(()=>({}));
+    throw new Error(err.error || 'Failed to create game result');
+  }
+};
+
+// Host deletes lobby locally (firestore rule ensures host)
+export const deleteLobbyClient = async (lobbyId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'lobbies', lobbyId));
 }; 

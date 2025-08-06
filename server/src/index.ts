@@ -855,6 +855,59 @@ app.post('/api/game/:lobbyId/end', verifyFirebaseToken, (async (req, res) => {
   }
 }) as RequestHandler);
 
+// === Create game result only ===
+app.post('/api/game/:lobbyId/result', verifyFirebaseToken, (async (req, res) => {
+  try {
+    const { lobbyId } = req.params;
+    const { autoEnd } = req.body;
+
+    const lobbyRef = db.collection('lobbies').doc(lobbyId);
+    const lobbySnap = await lobbyRef.get();
+    if (!lobbySnap.exists) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+    const lobbyData = lobbySnap.data() as any;
+
+    const callerUid = (req as any).user.uid;
+    if (callerUid !== lobbyData.hostFirebaseUid) {
+      return res.status(403).json({ error: 'Only the host can create game result' });
+    }
+
+    // Validate autoEnd if provided
+    if (autoEnd) {
+      const playlistSnap = await db.collection('playlists').doc(lobbyId).get();
+      const totalTracks = Object.keys(playlistSnap.data()?.songs || {}).length;
+      const guessedTracks = Object.keys(lobbyData.correctlyGuessedTracks || {}).length;
+      if (totalTracks === 0 || guessedTracks !== totalTracks) {
+        return res.status(400).json({ error: 'Not all tracks guessed' });
+      }
+    }
+
+    const scores: Record<string, number> = lobbyData.playerScores || {};
+    let winnerId: string | null = null;
+    let max = -Infinity;
+    for (const [pid, sc] of Object.entries(scores)) {
+      if (sc > max) { max = sc as number; winnerId = pid; }
+    }
+
+    const resultDoc = {
+      lobbyId,
+      hostId: lobbyData.hostFirebaseUid,
+      endedAt: admin.firestore.FieldValue.serverTimestamp(),
+      finalScores: scores,
+      players: lobbyData.players || {},
+      winnerId,
+      autoEnded: autoEnd || false
+    };
+
+    await db.collection('game_results').doc(lobbyId).set(resultDoc);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('create result error', err);
+    return res.status(500).json({ error: 'Internal' });
+  }
+}) as RequestHandler);
+
 // NEW: Watcher management endpoints for monitoring
 app.get('/api/watchers/status', ((_req, res) => {
   res.json({
