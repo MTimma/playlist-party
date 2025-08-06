@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { 
   subscribePlaylistCollection, 
   subscribeLobby,
   getCurrentUser,
-  signInAnonymouslyIfNeeded
+  signInAnonymouslyIfNeeded,
+  subscribeGameResult
 } from '../../services/firebase';
-import { validateGuess, checkPlayerGuess } from '../../services/backend';
+import { validateGuess, checkPlayerGuess, createGameResult, deleteLobbyClient } from '../../services/backend';
 import { TrackInfo } from '../TrackInfo/TrackInfo';
 import { GuessButtons } from '../GuessButtons/GuessButtons';
-import type { Track, PlaylistCollection, Lobby } from '../../types/types';
+import { EndGameSummary } from '../EndGameSummary/EndGameSummary';
+import type { Track, PlaylistCollection, Lobby, GameResult } from '../../types/types';
 import './Game.css';
 
 export const Game = () => {
@@ -29,6 +31,9 @@ export const Game = () => {
   const [currentTrackUri, setCurrentTrackUri] = useState<string | null>(null);
   const [correctlyGuessedTracks, setCorrectlyGuessedTracks] = useState<Record<string, boolean>>({});
   const [guessFeedback, setGuessFeedback] = useState<{ type: 'correct' | 'incorrect'; message: string } | null>(null);
+  const [gameResult, setGameResult] = useState<GameResult | null>(null);
+  // Hold unsubscribe for playlist listener so we can detach early
+  const playlistUnsubRef = useRef<() => void>();
   
   // Ensure the user is authenticated and keep uid in state
   useEffect(() => {
@@ -83,6 +88,26 @@ export const Game = () => {
     setCorrectlyGuessedTracks(lobby.correctlyGuessedTracks);
   }, [lobby?.correctlyGuessedTracks]);
 
+  // Auto-end game when all tracks are guessed
+  useEffect(() => {
+    if (!lobby || !playlistCollection || !lobbyId) return;
+    
+    // Only host should trigger auto-end to avoid race conditions
+    if (lobby.hostFirebaseUid !== currentUserId) return;
+    
+    const totalTracks = Object.keys(playlistCollection.songs || {}).length;
+    const guessedTracks = Object.keys(correctlyGuessedTracks).length;
+    
+    if (totalTracks > 0 && guessedTracks === totalTracks) {
+      console.log('All tracks guessed! Auto-ending game...');
+      createGameResult(lobbyId, true)
+        .then(()=> deleteLobbyClient(lobbyId))
+        .catch(err=>{
+          console.error('Failed to auto-end game:', err);
+        });
+    }
+  }, [lobby, playlistCollection, correctlyGuessedTracks, lobbyId, currentUserId]);
+
   // Check if player has already guessed for the current track - only when track URI changes
   useEffect(() => {
     const checkGuessStatus = async () => {
@@ -103,48 +128,42 @@ export const Game = () => {
     checkGuessStatus();
   }, [lobbyId, currentUserId, currentTrackUri]);
 
-  // Subscribe to lobby (now contains game state AND playback state)
+  // Restore lobby subscription to keep playback and status updates
   useEffect(() => {
     if (!lobbyId) return;
-    
+
     const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
+      // If lobby removed detach playlist listener
+      if (!lobbyData && playlistUnsubRef.current) {
+        playlistUnsubRef.current();
+        playlistUnsubRef.current = undefined;
+      }
+
       setLobby(lobbyData);
-      
+
       if (lobbyData && lobbyData.status === 'in_progress') {
         setLoading(false);
       }
-      
-      // Handle playback state from Firebase real-time updates
+
+      // Handle playback state updates
       if (lobbyData) {
-        console.log('Firebase playback update:', {
-          isPlaying: lobbyData.isPlaying,
-          hasCurrentTrack: !!lobbyData.currentTrack,
-          trackName: lobbyData.currentTrack?.name,
-          progressMs: lobbyData.progressMs
-        });
-        
         if (lobbyData.isPlaying && lobbyData.currentTrack) {
-          const incomingTrackData = lobbyData.currentTrack;
-          const incomingUri = incomingTrackData.uri;
-          
-          // Only update track state if URI actually changed
+          const incomingUri = lobbyData.currentTrack.uri;
           if (currentTrackUri !== incomingUri) {
             setCurrentTrackUri(incomingUri);
             setCurrentTrack({
               uri: incomingUri,
-              name: incomingTrackData.name,
-              artists: incomingTrackData.artists,
-              duration_ms: incomingTrackData.duration_ms,
+              name: lobbyData.currentTrack.name,
+              artists: lobbyData.currentTrack.artists,
+              duration_ms: lobbyData.currentTrack.duration_ms,
               album: {
-                name: incomingTrackData.album.name,
-                images: incomingTrackData.album.images
+                name: lobbyData.currentTrack.album.name,
+                images: lobbyData.currentTrack.album.images
               }
             } as Track);
-            // Reset guess status and feedback when track changes
             setHasGuessed(false);
             setGuessFeedback(null);
           }
-          
           setIsPlaying(true);
           setProgressMs(lobbyData.progressMs || 0);
           setLastUpdated(new Date());
@@ -156,25 +175,52 @@ export const Game = () => {
           }
           setProgressMs(0);
           setLastUpdated(new Date());
-          // Reset feedback when playback stops
           setGuessFeedback(null);
         }
       }
     });
-    
+
     return () => unsubscribe();
   }, [lobbyId, currentTrackUri]);
 
-  // Subscribe to playlist collection to get track info
+  // Subscribe to lobby (now contains game state AND playback state)
   useEffect(() => {
     if (!lobbyId) return;
-    
-    const unsubscribe = subscribePlaylistCollection(lobbyId, (collection) => {
+    // Detach existing listener first if any (lobby restart edge-case)
+    if (playlistUnsubRef.current) {
+      playlistUnsubRef.current();
+      playlistUnsubRef.current = undefined;
+    }
+
+    playlistUnsubRef.current = subscribePlaylistCollection(lobbyId, (collection) => {
       setPlaylistCollection(collection);
     });
-    
-    return () => unsubscribe();
+
+    return () => {
+      if (playlistUnsubRef.current) {
+        playlistUnsubRef.current();
+        playlistUnsubRef.current = undefined;
+      }
+    };
   }, [lobbyId]);
+
+  // Subscribe to game result document (after lobby deletion)
+  useEffect(() => {
+    if (!lobbyId) return;
+    const unsub = subscribeGameResult(lobbyId, (res) => setGameResult(res));
+    return () => unsub();
+  }, [lobbyId]);
+
+  const handleEndGameClick = async () => {
+    if (!lobbyId) return;
+    if (!window.confirm('End the game for all players?')) return;
+    try {
+      await createGameResult(lobbyId);
+      await deleteLobbyClient(lobbyId);
+    } catch (err: any) {
+      alert(err.message || 'Failed to end game');
+    }
+  };
 
   // Helper function to get track owner (needed for guessing game)
   const getTrackOwner = (trackUri: string): string | null => {
@@ -221,7 +267,7 @@ export const Game = () => {
           } else {
             setGuessFeedback({ 
               type: 'incorrect', 
-              message: `Oh no, that doesn't look correct! ${result.scoreChange} point${Math.abs(result.scoreChange) !== 1 ? 's' : ''}. It was ${result.correctOwnerName || 'someone else'}!` 
+              message: `Oh no, that doesn't look correct! ${result.scoreChange} point${Math.abs(result.scoreChange) !== 1 ? 's' : ''}!` 
             });
           }
           
@@ -300,6 +346,10 @@ export const Game = () => {
 
   // Handle lobby not in progress
   if (!lobby || lobby.status !== 'in_progress') {
+    // If lobby doc gone but we have game result, show summary
+    if (gameResult) {
+      return <EndGameSummary result={gameResult} currentUserId={currentUserId} />;
+    }
     return (
       <div className="game-container">
         <div className="waiting">
@@ -317,6 +367,11 @@ export const Game = () => {
         <div className="round-info">
           <span>Game in Progress</span>
         </div>
+        {lobby?.hostFirebaseUid === currentUserId && (
+          <button className="end-game-btn" onClick={handleEndGameClick}>
+            End Game
+          </button>
+        )}
       </div>
 
       {/* Score Board */}

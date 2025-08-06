@@ -7,6 +7,34 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import * as admin from 'firebase-admin';
+// Initialize admin SDK if not already initialised (guard against tests)
+try {
+  if (admin.apps.length === 0) {
+    admin.initializeApp();
+  }
+} catch {
+  // ignore duplicated init in hot-reload
+}
+
+// Middleware: verify Firebase ID token sent as Authorization: Bearer <token>
+import type { Request, Response, NextFunction } from 'express';
+
+const verifyFirebaseToken = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing auth token' });
+  }
+  const token = authHeader.split('Bearer ')[1];
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    (req as any).user = { uid: decoded.uid };
+    next();
+  } catch (err) {
+    console.error('Failed to verify Firebase ID token:', err);
+    return res.status(401).json({ error: 'Invalid auth token' });
+  }
+};
+
 import TrackWatcherManager from './watchers/trackWatcher';
 
 dotenv.config();
@@ -750,6 +778,133 @@ app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
   } catch (error) {
     console.error('Error checking guess status:', error);
     res.status(500).json({ error: 'Failed to check guess status' });
+  }
+}) as RequestHandler);
+
+// 11. End game and archive results – requires Firebase auth (host only)
+app.post('/api/game/:lobbyId/end', verifyFirebaseToken, (async (req, res) => {
+  try {
+    const { lobbyId } = req.params;
+    const { autoEnd } = req.body; // Flag to indicate if this is an auto-end due to all tracks guessed
+
+    // Fetch lobby document
+    const lobbyRef = db.collection('lobbies').doc(lobbyId);
+    const lobbySnap = await lobbyRef.get();
+    if (!lobbySnap.exists) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+
+    const lobbyData = lobbySnap.data() as any;
+
+    // For auto-end, verify all tracks are guessed instead of host check
+    if (autoEnd) {
+      // Get playlist to check total tracks
+      const playlistRef = db.collection('playlists').doc(lobbyId);
+      const playlistSnap = await playlistRef.get();
+      if (playlistSnap.exists) {
+        const playlistData = playlistSnap.data();
+        const totalTracks = Object.keys(playlistData?.songs || {}).length;
+        const guessedTracks = Object.keys(lobbyData.correctlyGuessedTracks || {}).length;
+        
+        if (totalTracks === 0 || guessedTracks !== totalTracks) {
+          return res.status(400).json({ error: 'Not all tracks have been guessed' });
+        }
+      }
+    } else {
+      // Manual end - verify host
+      const callerUid = (req as any).user?.uid || null;
+      if (callerUid && lobbyData.hostFirebaseUid && callerUid !== lobbyData.hostFirebaseUid) {
+        return res.status(403).json({ error: 'Only the host can end the game' });
+      }
+    }
+
+    // Determine winner & stats
+    const scores: Record<string, number> = lobbyData.playerScores || {};
+    let winnerId: string | null = null;
+    let maxScore = -Infinity;
+    for (const [pid, sc] of Object.entries(scores)) {
+      if (sc > maxScore) { maxScore = sc as number; winnerId = pid; }
+    }
+
+    const resultDoc = {
+      lobbyId,
+      hostId: lobbyData.hostFirebaseUid,
+      endedAt: admin.firestore.FieldValue.serverTimestamp(),
+      durationSec: lobbyData.startedAt && lobbyData.createdAt ?
+        Math.floor(((lobbyData.startedAt?.toDate?.() || new Date()).getTime() - (lobbyData.createdAt?.toDate?.() || new Date()).getTime())/1000) : null,
+      finalScores: scores,
+      players: lobbyData.players || {},
+      winnerId,
+      playlistId: lobbyData.playlistId || null,
+      autoEnded: autoEnd || false
+    };
+
+    // Write game result BEFORE deleting lobby (to keep data)
+    await db.collection('game_results').doc(lobbyId).set(resultDoc);
+
+    // Stop any active watcher
+    trackWatcherManager.stopWatcher(lobbyId);
+
+    // Delete lobby to clean up and stop snapshot updates
+    await lobbyRef.delete();
+
+    res.json({ success: true, result: resultDoc });
+  } catch (error) {
+    console.error('Error ending game:', error);
+    res.status(500).json({ error: 'Failed to end game' });
+  }
+}) as RequestHandler);
+
+// === Create game result only ===
+app.post('/api/game/:lobbyId/result', verifyFirebaseToken, (async (req, res) => {
+  try {
+    const { lobbyId } = req.params;
+    const { autoEnd } = req.body;
+
+    const lobbyRef = db.collection('lobbies').doc(lobbyId);
+    const lobbySnap = await lobbyRef.get();
+    if (!lobbySnap.exists) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+    const lobbyData = lobbySnap.data() as any;
+
+    const callerUid = (req as any).user.uid;
+    if (callerUid !== lobbyData.hostFirebaseUid) {
+      return res.status(403).json({ error: 'Only the host can create game result' });
+    }
+
+    // Validate autoEnd if provided
+    if (autoEnd) {
+      const playlistSnap = await db.collection('playlists').doc(lobbyId).get();
+      const totalTracks = Object.keys(playlistSnap.data()?.songs || {}).length;
+      const guessedTracks = Object.keys(lobbyData.correctlyGuessedTracks || {}).length;
+      if (totalTracks === 0 || guessedTracks !== totalTracks) {
+        return res.status(400).json({ error: 'Not all tracks guessed' });
+      }
+    }
+
+    const scores: Record<string, number> = lobbyData.playerScores || {};
+    let winnerId: string | null = null;
+    let max = -Infinity;
+    for (const [pid, sc] of Object.entries(scores)) {
+      if (sc > max) { max = sc as number; winnerId = pid; }
+    }
+
+    const resultDoc = {
+      lobbyId,
+      hostId: lobbyData.hostFirebaseUid,
+      endedAt: admin.firestore.FieldValue.serverTimestamp(),
+      finalScores: scores,
+      players: lobbyData.players || {},
+      winnerId,
+      autoEnded: autoEnd || false
+    };
+
+    await db.collection('game_results').doc(lobbyId).set(resultDoc);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('create result error', err);
+    return res.status(500).json({ error: 'Internal' });
   }
 }) as RequestHandler);
 

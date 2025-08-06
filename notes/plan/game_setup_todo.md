@@ -398,3 +398,9 @@ Next steps you might take
 Patch the front-end as above and test one full game start to verify the field appears in Firestore and /currently-playing/… returns JSON.
 Consider debouncing or back-off in the polling hook (e.g., stop polling for 30 s after a 401) to avoid hammering the server if a future auth error occurs.
 Log an explicit warning in the front-end when the first 401 arrives so the host knows they need to re-link Spotify.
+
+
+
+
+-- 8 In song selection dropdown double check if song is already selected
+-- 9 in song selection whole song row should be clickable for add. if already added, the whole row should be greyed out
