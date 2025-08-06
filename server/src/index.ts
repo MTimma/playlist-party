@@ -7,6 +7,34 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import * as admin from 'firebase-admin';
+// Initialize admin SDK if not already initialised (guard against tests)
+try {
+  if (admin.apps.length === 0) {
+    admin.initializeApp();
+  }
+} catch {
+  // ignore duplicated init in hot-reload
+}
+
+// Middleware: verify Firebase ID token sent as Authorization: Bearer <token>
+import type { Request, Response, NextFunction } from 'express';
+
+const verifyFirebaseToken = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing auth token' });
+  }
+  const token = authHeader.split('Bearer ')[1];
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    (req as any).user = { uid: decoded.uid };
+    next();
+  } catch (err) {
+    console.error('Failed to verify Firebase ID token:', err);
+    return res.status(401).json({ error: 'Invalid auth token' });
+  }
+};
+
 import TrackWatcherManager from './watchers/trackWatcher';
 
 dotenv.config();
@@ -753,8 +781,8 @@ app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
   }
 }) as RequestHandler);
 
-// 11. End game and archive results
-app.post('/api/game/:lobbyId/end', (async (req, res) => {
+// 11. End game and archive results – requires Firebase auth (host only)
+app.post('/api/game/:lobbyId/end', verifyFirebaseToken, (async (req, res) => {
   try {
     const { lobbyId } = req.params;
     const { autoEnd } = req.body; // Flag to indicate if this is an auto-end due to all tracks guessed
@@ -784,7 +812,7 @@ app.post('/api/game/:lobbyId/end', (async (req, res) => {
       }
     } else {
       // Manual end - verify host
-      const callerUid = (req as any).user?.uid || null; // assuming auth middleware sets req.user
+      const callerUid = (req as any).user?.uid || null;
       if (callerUid && lobbyData.hostFirebaseUid && callerUid !== lobbyData.hostFirebaseUid) {
         return res.status(403).json({ error: 'Only the host can end the game' });
       }

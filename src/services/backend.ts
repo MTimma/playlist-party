@@ -1,4 +1,5 @@
 import type { SpotifyUser } from '../types/types';
+import { getAuth } from 'firebase/auth';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -98,10 +99,14 @@ export const getSpotifyUser = async (): Promise<SpotifyUser> => {
 
 // End game (host only)
 export const endGame = async (lobbyId: string, autoEnd: boolean = false): Promise<void> => {
+  const auth = getAuth();
+  const idToken = await auth.currentUser?.getIdToken() || '';
+
   const response = await fetch(`${BACKEND_URL}/api/game/${lobbyId}/end`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
     },
     credentials: 'include',
     body: JSON.stringify({ autoEnd })

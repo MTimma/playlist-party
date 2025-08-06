@@ -126,6 +126,61 @@ export const Game = () => {
     checkGuessStatus();
   }, [lobbyId, currentUserId, currentTrackUri]);
 
+  // Restore lobby subscription to keep playback and status updates
+  useEffect(() => {
+    if (!lobbyId) return;
+
+    const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
+      // If lobby removed detach playlist listener
+      if (!lobbyData && playlistUnsubRef.current) {
+        playlistUnsubRef.current();
+        playlistUnsubRef.current = undefined;
+      }
+
+      setLobby(lobbyData);
+
+      if (lobbyData && lobbyData.status === 'in_progress') {
+        setLoading(false);
+      }
+
+      // Handle playback state updates
+      if (lobbyData) {
+        if (lobbyData.isPlaying && lobbyData.currentTrack) {
+          const incomingUri = lobbyData.currentTrack.uri;
+          if (currentTrackUri !== incomingUri) {
+            setCurrentTrackUri(incomingUri);
+            setCurrentTrack({
+              uri: incomingUri,
+              name: lobbyData.currentTrack.name,
+              artists: lobbyData.currentTrack.artists,
+              duration_ms: lobbyData.currentTrack.duration_ms,
+              album: {
+                name: lobbyData.currentTrack.album.name,
+                images: lobbyData.currentTrack.album.images
+              }
+            } as Track);
+            setHasGuessed(false);
+            setGuessFeedback(null);
+          }
+          setIsPlaying(true);
+          setProgressMs(lobbyData.progressMs || 0);
+          setLastUpdated(new Date());
+        } else {
+          setIsPlaying(false);
+          if (currentTrackUri !== null) {
+            setCurrentTrackUri(null);
+            setCurrentTrack(null);
+          }
+          setProgressMs(0);
+          setLastUpdated(new Date());
+          setGuessFeedback(null);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [lobbyId, currentTrackUri]);
+
   // Subscribe to lobby (now contains game state AND playback state)
   useEffect(() => {
     if (!lobbyId) return;

@@ -60,8 +60,16 @@ service cloud.firestore {
     match /playlists/{lobbyId} {
       // Only players in the corresponding lobby can read
       allow read: if request.auth != null
-        && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
-        && (request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.keys());
+        && (
+             // game is still active
+             (exists(/databases/$(database)/documents/lobbies/$(lobbyId))
+              && request.auth.uid in
+                 get(/databases/$(database)/documents/lobbies/$(lobbyId))
+                     .data.players.keys())
+             ||
+             // or the game just finished and a game-result exists
+             exists(/databases/$(database)/documents/game_results/$(lobbyId))
+           );
       
       // Only the host can create the playlist document
       allow create: if request.auth != null 
