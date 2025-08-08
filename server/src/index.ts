@@ -7,14 +7,6 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import * as admin from 'firebase-admin';
-// Initialize admin SDK if not already initialised (guard against tests)
-try {
-  if (admin.apps.length === 0) {
-    admin.initializeApp();
-  }
-} catch {
-  // ignore duplicated init in hot-reload
-}
 
 // Middleware: verify Firebase ID token sent as Authorization: Bearer <token>
 import type { Request, Response, NextFunction } from 'express';
@@ -39,16 +31,37 @@ import TrackWatcherManager from './watchers/trackWatcher';
 
 dotenv.config();
 
-// Initialize Firebase Admin SDK
+// Configure Firebase Admin SDK (supports emulator in development)
+const useProd = process.env.NODE_ENV === 'production' || process.env.VITE_USE_FIREBASE_PROD === 'true';
+
+if (!useProd) {
+  // Point Admin SDK to local emulators when not using production
+  if (!process.env.FIRESTORE_EMULATOR_HOST) {
+    process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+  }
+  if (!process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+  }
+  console.log('🔥 Using Firebase emulators for Admin SDK');
+}
+
+// Initialize Firebase Admin SDK once (after dotenv and emulator env are set)
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-    databaseURL: process.env.FIREBASE_DATABASE_URL,
-  });
+  if (useProd) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+      databaseURL: process.env.FIREBASE_DATABASE_URL,
+    });
+  } else {
+    // Emulator mode can initialize with minimal config; projectId helps namespace data
+    admin.initializeApp({
+      projectId: process.env.FIREBASE_PROJECT_ID || 'demo-music-game',
+    } as any);
+  }
 }
 
 const db = admin.firestore();
