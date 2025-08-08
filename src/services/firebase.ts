@@ -58,6 +58,9 @@ if (import.meta.env.DEV && !import.meta.env.VITE_USE_FIREBASE_PROD) {
   }
 }
 
+// Expose instances for other modules
+export { db, auth };
+
 // Note: Firebase offline persistence removed due to deprecated APIs
 // Will be re-implemented with modern persistence APIs in future Firebase upgrade
 

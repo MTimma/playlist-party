@@ -206,10 +206,10 @@ export const Game = () => {
 
   // Subscribe to game result document (after lobby deletion)
   useEffect(() => {
-    if (!lobbyId) return;
+    if (!lobbyId || !currentUserId) return; // wait until auth is ready per Firestore rules
     const unsub = subscribeGameResult(lobbyId, (res) => setGameResult(res));
     return () => unsub();
-  }, [lobbyId]);
+  }, [lobbyId, currentUserId]);
 
   const handleEndGameClick = async () => {
     if (!lobbyId) return;
