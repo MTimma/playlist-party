@@ -133,3 +133,20 @@ export interface LegacyGameState {
   round: number;
   maxRounds: number;
 } 
+
+export interface GameResult {
+  lobbyId: string;
+  hostId: string;
+  endedAt: Date | Timestamp;
+  durationSec?: number | null;
+  finalScores: {
+    [playerId: string]: number;
+  };
+  players: {
+    [playerId: string]: Player;
+  };
+  // List of winner player IDs (handles ties)
+  winnerIds: string[];
+  playlistId?: string | null;
+  autoEnded?: boolean;
+} 

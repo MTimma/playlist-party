@@ -4,12 +4,14 @@ import {
   subscribePlaylistCollection, 
   subscribeLobby,
   getCurrentUser,
-  signInAnonymouslyIfNeeded
+  signInAnonymouslyIfNeeded,
+  subscribeGameResult
 } from '../../services/firebase';
-import { validateGuess, checkPlayerGuess } from '../../services/backend';
+import { validateGuess, checkPlayerGuess, endGame } from '../../services/backend';
 import { TrackInfo } from '../TrackInfo/TrackInfo';
 import { GuessButtons } from '../GuessButtons/GuessButtons';
-import type { Track, PlaylistCollection, Lobby } from '../../types/types';
+import { EndGameSummary } from '../EndGameSummary/EndGameSummary';
+import type { Track, PlaylistCollection, Lobby, GameResult } from '../../types/types';
 import './Game.css';
 
 export const Game = () => {
@@ -29,6 +31,7 @@ export const Game = () => {
   const [currentTrackUri, setCurrentTrackUri] = useState<string | null>(null);
   const [correctlyGuessedTracks, setCorrectlyGuessedTracks] = useState<Record<string, boolean>>({});
   const [guessFeedback, setGuessFeedback] = useState<{ type: 'correct' | 'incorrect'; message: string } | null>(null);
+  const [gameResult, setGameResult] = useState<GameResult | null>(null);
   
   // Ensure the user is authenticated and keep uid in state
   useEffect(() => {
@@ -82,6 +85,24 @@ export const Game = () => {
     
     setCorrectlyGuessedTracks(lobby.correctlyGuessedTracks);
   }, [lobby?.correctlyGuessedTracks]);
+
+  // Auto-end game when all tracks are guessed
+  useEffect(() => {
+    if (!lobby || !playlistCollection || !lobbyId) return;
+    
+    // Only host should trigger auto-end to avoid race conditions
+    if (lobby.hostFirebaseUid !== currentUserId) return;
+    
+    const totalTracks = Object.keys(playlistCollection.songs || {}).length;
+    const guessedTracks = Object.keys(correctlyGuessedTracks).length;
+    
+    if (totalTracks > 0 && guessedTracks === totalTracks) {
+      console.log('All tracks guessed! Auto-ending game...');
+      endGame(lobbyId, true).catch(err => {
+        console.error('Failed to auto-end game:', err);
+      });
+    }
+  }, [lobby, playlistCollection, correctlyGuessedTracks, lobbyId, currentUserId]);
 
   // Check if player has already guessed for the current track - only when track URI changes
   useEffect(() => {
@@ -176,6 +197,26 @@ export const Game = () => {
     return () => unsubscribe();
   }, [lobbyId]);
 
+  // Subscribe to game result document (after lobby deletion)
+  useEffect(() => {
+    if (!lobbyId) return;
+    const unsub = subscribeGameResult(lobbyId, (res) => {
+      setGameResult(res);
+      setLoading(false); //When opening game that has ended
+    });
+    return () => unsub();
+  }, [lobbyId]);
+
+  const handleEndGameClick = async () => {
+    if (!lobbyId) return;
+    if (!window.confirm('End the game for all players?')) return;//TODO change to a modal
+    try {
+      await endGame(lobbyId);
+    } catch (err: any) {
+      alert(err.message || 'Failed to end game');
+    }
+  };
+
   // Helper function to get track owner (needed for guessing game)
   const getTrackOwner = (trackUri: string): string | null => {
     if (!playlistCollection) return null;
@@ -221,7 +262,7 @@ export const Game = () => {
           } else {
             setGuessFeedback({ 
               type: 'incorrect', 
-              message: `Oh no, that doesn't look correct! ${result.scoreChange} point${Math.abs(result.scoreChange) !== 1 ? 's' : ''}. It was ${result.correctOwnerName || 'someone else'}!` 
+              message: `Oh no, that doesn't look correct! ${result.scoreChange} point${Math.abs(result.scoreChange) !== 1 ? 's' : ''}!` 
             });
           }
           
@@ -300,6 +341,10 @@ export const Game = () => {
 
   // Handle lobby not in progress
   if (!lobby || lobby.status !== 'in_progress') {
+    // If lobby doc gone but we have game result, show summary
+    if (gameResult) {
+      return <EndGameSummary result={gameResult} currentUserId={currentUserId} />;
+    }
     return (
       <div className="game-container">
         <div className="waiting">
@@ -317,6 +362,11 @@ export const Game = () => {
         <div className="round-info">
           <span>Game in Progress</span>
         </div>
+        {lobby?.hostFirebaseUid === currentUserId && (
+          <button className="end-game-btn" onClick={handleEndGameClick}>
+            End Game
+          </button>
+        )}
       </div>
 
       {/* Score Board */}

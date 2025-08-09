@@ -753,6 +753,83 @@ app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
   }
 }) as RequestHandler);
 
+// 11. End game and archive results
+app.post('/api/game/:lobbyId/end', (async (req, res) => {
+  try {
+    const { lobbyId } = req.params;
+    const { autoEnd } = req.body; // Flag to indicate if this is an auto-end due to all tracks guessed
+
+    // Fetch lobby document
+    const lobbyRef = db.collection('lobbies').doc(lobbyId);
+    const lobbySnap = await lobbyRef.get();
+    if (!lobbySnap.exists) {
+      return res.status(404).json({ error: 'Lobby not found' });
+    }
+
+    const lobbyData = lobbySnap.data() as any;
+
+    // For auto-end, verify all tracks are guessed instead of host check
+    if (autoEnd) {
+      // Get playlist to check total tracks
+      const playlistRef = db.collection('playlists').doc(lobbyId);
+      const playlistSnap = await playlistRef.get();
+      if (playlistSnap.exists) {
+        const playlistData = playlistSnap.data();
+        const totalTracks = Object.keys(playlistData?.songs || {}).length;
+        const guessedTracks = Object.keys(lobbyData.correctlyGuessedTracks || {}).length;
+        
+        if (totalTracks === 0 || guessedTracks !== totalTracks) {
+          return res.status(400).json({ error: 'Not all tracks have been guessed' });
+        }
+      }
+    } else {
+      // Manual end - verify host
+      const callerUid = (req as any).user?.uid || null; // assuming auth middleware sets req.user
+      if (callerUid && lobbyData.hostFirebaseUid && callerUid !== lobbyData.hostFirebaseUid) {
+        return res.status(403).json({ error: 'Only the host can end the game' });
+      }
+    }
+
+    // Determine winner & stats
+    const scores: Record<string, number> = lobbyData.playerScores || {};
+    // Determine highest score and find all players who have it (handle ties)
+    let maxScore = -Infinity;
+    for (const sc of Object.values(scores)) {
+      if ((sc as number) > maxScore) maxScore = sc as number;
+    }
+    const winnerIds: string[] = Object.entries(scores)
+      .filter(([, sc]) => (sc as number) === maxScore)
+      .map(([pid]) => pid);
+
+    const resultDoc = {
+      lobbyId,
+      hostId: lobbyData.hostFirebaseUid,
+      endedAt: admin.firestore.FieldValue.serverTimestamp(),
+      durationSec: lobbyData.startedAt && lobbyData.createdAt ?
+        Math.floor(((lobbyData.startedAt?.toDate?.() || new Date()).getTime() - (lobbyData.createdAt?.toDate?.() || new Date()).getTime())/1000) : null,
+      finalScores: scores,
+      players: lobbyData.players || {},
+      winnerIds,
+      playlistId: lobbyData.playlistId || null,
+      autoEnded: autoEnd || false
+    };
+
+    // Write game result BEFORE deleting lobby (to keep data)
+    await db.collection('game_results').doc(lobbyId).set(resultDoc);
+
+    // Stop any active watcher
+    trackWatcherManager.stopWatcher(lobbyId);
+
+    // Delete lobby to clean up and stop snapshot updates
+    await lobbyRef.delete();
+
+    res.json({ success: true, result: resultDoc });
+  } catch (error) {
+    console.error('Error ending game:', error);
+    res.status(500).json({ error: 'Failed to end game' });
+  }
+}) as RequestHandler);
+
 // NEW: Watcher management endpoints for monitoring
 app.get('/api/watchers/status', ((_req, res) => {
   res.json({
