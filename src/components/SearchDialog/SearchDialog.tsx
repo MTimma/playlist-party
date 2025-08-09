@@ -12,6 +12,8 @@ interface SearchDialogProps {
 interface SearchResult extends Track {
   isAlreadyAdded?: boolean;
   isDuplicate?: boolean;
+  addedBy?: string | null;
+  isAddedByCurrentUser?: boolean;
 }
 
 export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
@@ -27,10 +29,25 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
 
     const unsubscribe = subscribePlaylistCollection(lobbyId, (collection) => {
       setPlaylistData(collection);
+      
+      // Update search results if they exist
+      if (searchResults.length > 0 && collection) {
+        setSearchResults(prevResults => 
+          prevResults.map(track => {
+            const songData = collection.songs?.[track.uri];
+            return {
+              ...track,
+              isDuplicate: !!songData,
+              addedBy: songData?.addedBy || null,
+              isAddedByCurrentUser: songData?.addedBy === currentUserId
+            };
+          })
+        );
+      }
     });
 
     return unsubscribe;
-  }, [lobbyId]);
+  }, [lobbyId, currentUserId, searchResults.length]);
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -58,11 +75,15 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
         const data = await response.json();
         
         // Check for duplicates against existing playlist songs
-        const playlistSongUris = playlistData?.songs ? Object.keys(playlistData.songs) : [];
-        const resultsWithDuplicateCheck = data.tracks.map((track: Track) => ({
-          ...track,
-          isDuplicate: playlistSongUris.includes(track.uri)
-        }));
+        const resultsWithDuplicateCheck = data.tracks.map((track: Track) => {
+          const songData = playlistData?.songs?.[track.uri];
+          return {
+            ...track,
+            isDuplicate: !!songData,
+            addedBy: songData?.addedBy || null,
+            isAddedByCurrentUser: songData?.addedBy === currentUserId
+          };
+        });
 
         setSearchResults(resultsWithDuplicateCheck);
       } catch (err) {
@@ -73,7 +94,7 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
         setIsSearching(false);
       }
     }, 400),
-    [playlistData]
+    [playlistData, currentUserId]
   );
 
   // Trigger search when query changes
@@ -84,7 +105,12 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
     };
   }, [query, debouncedSearch]);
 
-  const handleAddTrack = async (track: Track) => {
+  const handleAddTrack = async (track: SearchResult) => {
+    // Don't allow adding if already added by someone else
+    if (track.isDuplicate && !track.isAddedByCurrentUser) {
+      return;
+    }
+
     try {
       setError(null);
       console.log('Adding track proposal:', {
@@ -99,7 +125,7 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
       setSearchResults(prev => 
         prev.map(result => 
           result.uri === track.uri 
-            ? { ...result, isDuplicate: true }
+            ? { ...result, isDuplicate: true, addedBy: currentUserId, isAddedByCurrentUser: true }
             : result
         )
       );
@@ -115,13 +141,26 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
     }
   };
 
-  const playPreview = (previewUrl: string) => {
+  const playPreview = (previewUrl: string, event: React.MouseEvent) => {
+    // Stop propagation to prevent triggering row click
+    event.stopPropagation();
+    
     // Create audio element for preview
     const audio = new Audio(previewUrl);
     audio.volume = 0.5;
     audio.play().catch(err => {
       console.error('Error playing preview:', err);
     });
+  };
+
+  const getTrackStatus = (track: SearchResult) => {
+    if (!track.isDuplicate) return null;
+    
+    if (track.isAddedByCurrentUser) {
+      return { text: 'Added by you', className: 'added-by-user' };
+    } else {
+      return { text: 'Already added', className: 'added-by-other' };
+    }
   };
 
   return (
@@ -152,55 +191,67 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
 
         {searchResults.length > 0 && (
           <div className="search-results">
-            {searchResults.map((track) => (
-              <div key={track.uri} className="search-result-item">
-                <div className="track-info">
-                  <img 
-                    src={track.album.images[2]?.url || track.album.images[0]?.url} 
-                    alt={track.album.name}
-                    className="track-image"
-                  />
-                  <div className="track-details">
-                    <h5 className="track-name">{track.name}</h5>
-                    <p className="track-artist">
-                      {track.artists.map(artist => artist.name).join(', ')}
-                    </p>
-                    <p className="track-album">{track.album.name}</p>
+            {searchResults.map((track) => {
+              const status = getTrackStatus(track);
+              const isClickable = !track.isDuplicate || track.isAddedByCurrentUser;
+              
+              return (
+                <div 
+                  key={track.uri} 
+                  className={`search-result-item ${!isClickable ? 'disabled' : ''} ${track.isDuplicate ? 'already-added' : ''}`}
+                  onClick={() => isClickable && handleAddTrack(track)}
+                  role="button"
+                  tabIndex={isClickable ? 0 : -1}
+                  aria-disabled={!isClickable}
+                >
+                  <div className="track-info">
+                    <img 
+                      src={track.album.images[2]?.url || track.album.images[0]?.url} 
+                      alt={track.album.name}
+                      className="track-image"
+                    />
+                    <div className="track-details">
+                      <h5 className="track-name">{track.name}</h5>
+                      <p className="track-artist">
+                        {track.artists.map(artist => artist.name).join(', ')}
+                      </p>
+                      <p className="track-album">{track.album.name}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="track-actions">
+                    {track.preview_url && (
+                      <button
+                        onClick={(e) => playPreview(track.preview_url!, e)}
+                        className="preview-btn"
+                        title="Play 30s preview"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </button>
+                    )}
+                    
+                    {status && (
+                      <div className={`track-status ${status.className}`}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                        <span>{status.text}</span>
+                      </div>
+                    )}
+                    
+                    {!track.isDuplicate && (
+                      <div className="add-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                <div className="track-actions">
-                  {track.preview_url && (
-                    <button
-                      onClick={() => playPreview(track.preview_url!)}
-                      className="preview-btn"
-                      title="Play 30s preview"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => handleAddTrack(track)}
-                    disabled={track.isDuplicate}
-                    className={`add-btn ${track.isDuplicate ? 'disabled' : ''}`}
-                    title={track.isDuplicate ? 'Already added' : 'Add to playlist'}
-                  >
-                    {track.isDuplicate ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                      </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
