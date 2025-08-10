@@ -57,17 +57,15 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
   };
 
   return (<>
-    <div className="player-list-header">
+    {/* <div className="player-list-header">
         <h3 className="player-list-title">Players</h3>
         <div className="player-count">
           <span className="current-count">{currentPlayerCount}</span>
           <span className="count-separator">/</span>
           <span className="max-count">{maxPlayers}</span>
         </div>
-      </div>
+      </div> */}
     <div className="player-list">
-      
-
       <div className="players-grid">
         {playerArray.map((player) => (
           <div
@@ -136,7 +134,7 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
         ))}
 
         {/* Empty slots */}
-        {Array.from({ length: maxPlayers - currentPlayerCount }).map((_, index) => (
+        {/* {Array.from({ length: maxPlayers - currentPlayerCount }).map((_, index) => (
           <div key={`empty-${index}`} className="player-card empty">
             <div className="player-avatar">
               <div className="avatar-placeholder empty">
@@ -149,7 +147,7 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
               <div className="player-name empty">Waiting for player...</div>
             </div>
           </div>
-        ))}
+        ))} */}
       </div>
 
       {currentPlayerCount >= maxPlayers && (

@@ -28,7 +28,7 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
             <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
           </svg>
           <p>No songs added yet</p>
-          <span>Use the search above to add your first track!</span>
+          <span>Use the search below to add your first track!</span>
         </div>
       </div>
     );
@@ -43,7 +43,7 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
       {/* <div className="my-songs-header" onClick={() => setIsExpanded(!isExpanded)}> */}
       <div className="my-songs-header" >
         <div className="header-content">
-          
+          My songs
         </div>
         {/* <button className="expand-button" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
           <svg 
@@ -83,12 +83,12 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
                 <div className="song-artist">{formatArtists(track.artists)}</div>
               </div>
 
-              <div className="song-status">
+              {/* <div className="song-status">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="status-icon approved">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                 </svg>
                 <span className="status-text">Added to playlist</span>
-              </div>
+              </div> */}
             </div>
           ))}
         </div>

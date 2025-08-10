@@ -21,7 +21,31 @@
 
 .search-input-container {
   position: relative;
-  margin-bottom: 1.5rem;
+}
+
+/* Clear (X) button inside search input */
+.clear-input-btn {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  transition: color 0.2s ease;
+}
+
+.clear-input-btn:hover {
+  color: #ffffff;
+}
+
+.clear-input-btn svg {
+  pointer-events: none;
 }
 
 .search-input {
@@ -34,6 +58,8 @@
   font-size: 1rem;
   outline: none;
   transition: all 0.2s ease;
+  box-sizing: border-box; /* keep padding inside width to prevent overflow */
+  padding-right: 3rem;    /* reserve space for clear button/spinner */
 }
 
 .search-input:focus {
@@ -47,7 +73,8 @@
 
 .search-spinner {
   position: absolute;
-  right: 1rem;
+  /* If clear button visible, place spinner slightly to the left */
+  right: 3rem;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -120,7 +147,6 @@
 .track-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
   flex: 1;
   min-width: 0;
 }
@@ -141,6 +167,8 @@
 .track-details {
   min-width: 0;
   flex: 1;
+  line-height: 1;
+  margin: 0;
 }
 
 .track-name {
@@ -156,7 +184,6 @@
 .track-artist {
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
-  margin: 0 0 0.25rem 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -259,15 +286,7 @@
   border-bottom: none;
 }
 
-.proposal-item .track-details h6 {
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin: 0 0 0.25rem 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 
 .proposal-status {
   display: flex;
@@ -342,15 +361,39 @@
 /* Responsive design */
 @media (max-width: 768px) {
   .search-dialog {
-    padding: 1rem;
+    padding: 0.75rem;
   }
+  .search-section h4 { margin-bottom: 0.75rem; }
+  .search-input { padding: 0.75rem 1rem; padding-right: 2.5rem; font-size: 0.95rem; }
+  .clear-input-btn { right: 0.75rem; }
+  .search-spinner { right: 2.5rem; }
   
   .search-result-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
-    padding: 0.75rem;
+    gap: 0.5rem;
+    padding: 0.5rem; /* tighter to maximize content width */
   }
+
+  /* Shrink track image on mobile */
+  .search-result-item .track-image {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Reduce font sizes for mobile cards */
+  .search-result-item .track-name {
+    font-size: 0.95rem;
+  }
+
+  .search-result-item .track-artist,
+  .search-result-item .track-album {
+    font-size: 0.8rem;
+  }
+  .track-details { line-height: 1.15; }
+  .track-actions { gap: 0.5rem; }
+  .preview-btn, .add-btn { width: 34px; height: 34px; }
+  .add-icon { width: 34px; height: 34px; }
   
   .search-result-item:hover:not(.disabled) {
     transform: none;

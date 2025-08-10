@@ -3,6 +3,7 @@ import { debounce } from 'lodash';
 import { addTrackToPlaylist, subscribePlaylistCollection } from '../../services/firebase';
 import type { Track, PlaylistCollection } from '../../types/types';
 import './SearchDialog.css';
+import TrackInfoCard from '../TrackInfoCard/TrackInfoCard';
 
 interface SearchDialogProps {
   lobbyId: string;
@@ -166,7 +167,7 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
   return (
     <div className="search-dialog">
       <div className="search-section">
-        <h4>Add Songs to Playlist</h4>
+        <h4>Add your favorite songs to the playlist!</h4>
         
         <div className="search-input-container">
           <input
@@ -176,6 +177,24 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
             placeholder="Search for songs..."
             className="search-input"
           />
+
+          {/* Clear (X) button */}
+          {query && !isSearching && (
+            <button
+              type="button"
+              className="clear-input-btn"
+              onClick={() => {
+                setQuery('');
+                setSearchResults([]);
+              }}
+              aria-label="Clear search input"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+
           {isSearching && (
             <div className="search-spinner">
               <div className="spinner small"></div>
@@ -194,61 +213,21 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
             {searchResults.map((track) => {
               const status = getTrackStatus(track);
               const isClickable = !track.isDuplicate || track.isAddedByCurrentUser;
-              
+              const albumImage = track.album.images[2]?.url || track.album.images[0]?.url;
+
               return (
-                <div 
-                  key={track.uri} 
-                  className={`search-result-item ${!isClickable ? 'disabled' : ''} ${track.isDuplicate ? 'already-added' : ''}`}
-                  onClick={() => isClickable && handleAddTrack(track)}
-                  role="button"
-                  tabIndex={isClickable ? 0 : -1}
-                  aria-disabled={!isClickable}
-                >
-                  <div className="track-info">
-                    <img 
-                      src={track.album.images[2]?.url || track.album.images[0]?.url} 
-                      alt={track.album.name}
-                      className="track-image"
-                    />
-                    <div className="track-details">
-                      <h5 className="track-name">{track.name}</h5>
-                      <p className="track-artist">
-                        {track.artists.map(artist => artist.name).join(', ')}
-                      </p>
-                      <p className="track-album">{track.album.name}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="track-actions">
-                    {track.preview_url && (
-                      <button
-                        onClick={(e) => playPreview(track.preview_url!, e)}
-                        className="preview-btn"
-                        title="Play 30s preview"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                      </button>
-                    )}
-                    
-                    {status && (
-                      <div className={`track-status ${status.className}`}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                        </svg>
-                        <span>{status.text}</span>
-                      </div>
-                    )}
-                    
-                    {!track.isDuplicate && (
-                      <div className="add-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                        </svg>
-                      </div>
-                    )}
-                  </div>
+                <div key={track.uri} style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <TrackInfoCard
+                    albumImageUrl={albumImage}
+                    name={track.name}
+                    artistsText={track.artists.map((a) => a.name).join(', ')}
+                    statusText={status?.text || null}
+                    statusVariant={status?.className as 'added-by-user' | 'added-by-other' | undefined}
+                    isDisabled={!isClickable}
+                    onClick={() => isClickable && handleAddTrack(track)}
+                    hasPreview={!!track.preview_url}
+                    onPreview={(e) => track.preview_url && playPreview(track.preview_url, e)}
+                  />
                 </div>
               );
             })}
