@@ -190,18 +190,22 @@ export const Lobby = () => {
   return (
     <div className="lobby-container">
       <div className="lobby-content">
-        <div className="lobby-header">
-          <div className="lobby-info">
+
+        { isHost && (
+          <div className="lobby-header">
+          {/* <div className="lobby-info">
             <h1 className="lobby-title">Game Lobby</h1>
             <div className="lobby-id">
               <span className="lobby-id-label">Lobby ID:</span>
               <code className="lobby-id-value">{lobbyId}</code>
             </div>
             <div className="lobby-status">
+
               <div className={`status-indicator ${lobby.status}`}></div>
               <span className="status-text">{getStatusMessage()}</span>
             </div>
-          </div>
+            
+          </div> */}
 
           <div className="lobby-actions">
             {isHost ? (
@@ -227,48 +231,34 @@ export const Lobby = () => {
                   )}
                 </button>
               </div>
-            ) : (
-              <button
-                onClick={handleLeaveLobby}
-                className="action-btn secondary"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
-                </svg>
-                Leave Lobby
-              </button>
-            )}
+            ) : (<>
+              {/* // <button
+              //   onClick={handleLeaveLobby}
+              //   className="action-btn secondary"
+              // >
+              //   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              //     <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+              //   </svg>
+              //   Leave Lobby
+              // </button> */}
+            </>)}
           </div>
-        </div>
+        </div>)}
 
-        <PlayerList
-          players={lobby.players}
-          maxPlayers={lobby.maxPlayers}
-          currentUserId={currentUserId}
-        />
-
-
-        {lobby.status === 'collecting_songs' && (
-          <div className="collection-phase">
-            <div className="phase-header">
-              <h3>Song Collection Phase</h3>
-              <div className="readiness-summary">
-                {getReadyCount()} of {Object.keys(lobby.players).length} players ready
-              </div>
-            </div>
-            <p>Add songs to the playlist and mark yourself ready when done. The game will start once everyone is ready.</p>
+        
+        {lobby.status === 'collecting_songs' && (<>
             
+        
+            <MySongs 
+                lobbyId={lobbyId!}
+                userId={currentUserId}
+              />
+              
             {/* Search dialog for all players */}
             <SearchDialog 
               lobbyId={lobbyId!}
               currentUserId={currentUserId}
             />
-            
-              <MySongs 
-                lobbyId={lobbyId!}
-                userId={currentUserId}
-              />
-            
             {/* Ready button for all players */}
             {getCurrentPlayer() && (
               <div className="ready-section">
@@ -283,9 +273,11 @@ export const Lobby = () => {
                 )}
               </div>
             )}
-            
-            {/* Playlist stats for host */}
-            {isHost && (
+        <div className="readiness-summary">
+              {getReadyCount()} of {Object.keys(lobby.players).length} players ready
+        </div>
+      {/* Playlist stats for host */}
+      {isHost && (
               <PlaylistStats 
                 lobbyId={lobbyId!}
                 onStartGame={handleStartGameRequest}
@@ -305,7 +297,12 @@ export const Lobby = () => {
                 </div>
               </div>
             )}
-          </div>
+        <PlayerList
+          players={lobby.players}
+          maxPlayers={lobby.maxPlayers}
+          currentUserId={currentUserId}
+        />
+          </>
         )}
       </div>
 
@@ -317,6 +314,8 @@ export const Lobby = () => {
         onConfirm={handleStartGameConfirm}
         onCancel={handleStartGameCancel}
       />
+
+      
     </div>
   );
 }; 

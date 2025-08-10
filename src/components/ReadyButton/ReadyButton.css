@@ -45,9 +45,6 @@
   transform: translateY(-1px);
 }
 
-.ready-button.loading {
-  pointer-events: none;
-}
 
 .ready-icon {
   display: flex;
@@ -60,9 +57,9 @@
   font-weight: 600;
 }
 
-.loading-spinner {
-  width: 16px;
-  height: 16px;
+.ready-button .loading-spinner {
+  width: 10px;
+  height: 10px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top: 2px solid white;
   border-radius: 50%;

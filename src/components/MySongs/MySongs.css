@@ -13,6 +13,7 @@
 
 .my-songs-header {
   display: flex;
+  
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
@@ -20,6 +21,11 @@
   transition: background-color 0.2s ease;
   border-bottom: 1px solid #374151;
 }
+
+.header-content {
+  text-align: center;
+}
+
 
 .my-songs-header:hover {
   background: #1f2937;

@@ -1,0 +1,132 @@
+.track-info-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: white;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.06s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.track-info-card:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+}
+
+.track-info-card:active:not(.disabled) {
+  transform: translateY(1px);
+}
+
+.track-info-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.track-info-card.status-added-by-user {
+  background: rgba(29, 185, 84, 0.09);
+  border-color: rgba(29, 185, 84, 0.25);
+}
+
+.track-info-card.status-added-by-other {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.track-info-card__image {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.track-info-card__details {
+  min-width: 0;
+}
+
+.track-info-card__name {
+  font-size: 0.98rem;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-info-card__artists {
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-info-card__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.track-info-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  border: 1px solid transparent;
+}
+
+.track-info-card__status.added-by-user {
+  background: rgba(29, 185, 84, 0.15);
+  color: #4ade80;
+  border-color: rgba(29, 185, 84, 0.3);
+}
+
+.track-info-card__status.added-by-other {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.75);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.track-info-card__preview-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  transition: background 0.2s ease, transform 0.06s ease;
+}
+
+.track-info-card__preview-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.track-info-card__preview-btn:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .track-info-card {
+    grid-template-columns: 40px 1fr auto;
+    gap: 10px;
+    padding: 8px 10px;
+  }
+  .track-info-card__image { width: 40px; height: 40px; }
+  .track-info-card__name { font-size: 0.95rem; }
+  .track-info-card__artists { font-size: 0.8rem; }
+}
+
+
