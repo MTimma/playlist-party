@@ -58,6 +58,7 @@
 }
 
 .ready-button .loading-spinner {
+  margin: 0;
   width: 10px;
   height: 10px;
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -79,3 +80,6 @@
     min-width: 100px;
   }
 } 
+.ready-button.loading {
+  padding: 0.625rem 1.25rem;
+}

@@ -122,7 +122,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID!;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
-const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI!;
+const REDIRECT_URI_ENV = process.env.SPOTIFY_REDIRECT_URI || null;
 const FRONTEND_URL = process.env.FRONTEND_URL!;
 const SPOTIFY_ACCOUNTS_URL = process.env.SPOTIFY_ACCOUNTS_URL || 'https://accounts.spotify.com';
 
@@ -197,8 +197,13 @@ const getClientCredentialsToken = async (): Promise<string> => {
   }
 };
 
+// Helper to determine which redirect URI to use (env var overrides dynamic)
+const getRedirectUri = (req: express.Request): string => {
+  return REDIRECT_URI_ENV || `${req.protocol}://${req.get('host')}/callback`;
+};
+
 // 1. Redirect user to Spotify login
-app.get('/login', (_req, res) => {
+app.get('/login', (req, res) => {
   const scope = [
     'user-read-private',
     'user-read-email',
@@ -208,7 +213,8 @@ app.get('/login', (_req, res) => {
     'playlist-modify-private',
     'playlist-modify-public'
   ].join(' ');
-  const authUrl = `${SPOTIFY_ACCOUNTS_URL}/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+  const redirectUri = getRedirectUri(req);
+  const authUrl = `${SPOTIFY_ACCOUNTS_URL}/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
   res.redirect(authUrl);
 });
 
@@ -219,10 +225,11 @@ app.get('/callback', (req, res) => {
     if (!code) return res.status(400).send('Missing code');
 
     try {
+      const redirectUri = getRedirectUri(req);
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: redirectUri,
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
       });
@@ -319,7 +326,11 @@ app.get('/me', (async (req, res) => {
     const userRes = await axios.get('https://api.spotify.com/v1/me', {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-    res.json(userRes.data);
+    const profile = userRes.data;
+    if (profile.product !== 'premium') {
+      return res.status(403).json({ error: 'Premium account required' });
+    }
+    res.json(profile);
   } catch {
     res.status(500).json({ error: 'Failed to fetch user profile' });
   }

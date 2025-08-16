@@ -276,6 +276,12 @@ export const Lobby = () => {
         <div className="readiness-summary">
               {getReadyCount()} of {Object.keys(lobby.players).length} players ready
         </div>
+
+        <PlayerList
+          players={lobby.players}
+          maxPlayers={lobby.maxPlayers}
+          currentUserId={currentUserId}
+        />
       {/* Playlist stats for host */}
       {isHost && (
               <PlaylistStats 
@@ -297,11 +303,6 @@ export const Lobby = () => {
                 </div>
               </div>
             )}
-        <PlayerList
-          players={lobby.players}
-          maxPlayers={lobby.maxPlayers}
-          currentUserId={currentUserId}
-        />
           </>
         )}
       </div>

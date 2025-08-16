@@ -1,6 +1,6 @@
 import type { SpotifyUser } from '../types/types';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 if (!BACKEND_URL) {
   throw new Error('VITE_BACKEND_URL environment variable is required');
@@ -87,6 +87,11 @@ export const getSpotifyUser = async (): Promise<SpotifyUser> => {
     method: 'GET',
     credentials: 'include',
   });
+
+  if (response.status === 403) {
+    // Server indicates user is not Premium
+    throw new Error('premium_required');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

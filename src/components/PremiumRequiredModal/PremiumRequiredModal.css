@@ -1,0 +1,61 @@
+.premium-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.premium-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 420px;
+  padding: 24px 32px;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.premium-modal-title {
+  font-size: 1.5rem;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.premium-modal-text {
+  font-size: 1rem;
+  margin-bottom: 24px;
+  color: #333;
+}
+
+.premium-modal-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.premium-modal-learnmore {
+  background: #1db954;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.premium-modal-close {
+  background: transparent;
+  border: 2px solid #1db954;
+  color: #1db954;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+

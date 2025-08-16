@@ -84,7 +84,3 @@ npm run dev
 - Firebase Realtime Database
 - Spotify Web API
 - Tailwind CSS
-
-## License
-
-MIT

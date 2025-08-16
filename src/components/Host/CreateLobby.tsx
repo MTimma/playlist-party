@@ -41,9 +41,6 @@ export const CreateLobby = () => {
       });
       const data = await response.json();
       setSpotifyUser(data);
-      if (data.display_name && !hostName) {
-        setHostName(data.display_name);
-      }
     } catch (error) {
       console.error('Error fetching Spotify user:', error);
       setSpotifyUser(null);

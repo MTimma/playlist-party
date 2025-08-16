@@ -28,6 +28,7 @@ export interface SpotifyUser {
   id: string;
   display_name: string;
   images: Array<{ url: string }>;
+  product?: 'premium' | 'free'; // Indicates Spotify plan
 }
 
 export interface Lobby {

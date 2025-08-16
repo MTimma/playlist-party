@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { verifyHostStatus } from '../services/firebase';
-import { getSpotifyUser as backendGetSpotifyUser } from '../services/backend';
+import { getSpotifyUser as backendGetSpotifyUser, BACKEND_URL } from '../services/backend';
 import type { SpotifyUser } from '../types/types';
+import PremiumRequiredModal from '../components/PremiumRequiredModal/PremiumRequiredModal';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -10,6 +11,7 @@ interface AuthContextType {
   logout: () => void;
   getAccessToken: () => Promise<string | null>;
   getSpotifyUser: () => Promise<SpotifyUser | null>;
+  requiresPremium: boolean;
   isHostOfLobby: (lobbyId: string) => Promise<boolean>; // NEW
 }
 
@@ -17,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [requiresPremium, setRequiresPremium] = useState<boolean>(false);
 
   useEffect(() => {
     // Check if we have a valid session on mount
@@ -25,7 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8888/auth/status', {
+      const response = await fetch(`${BACKEND_URL}/auth/status`, {
         credentials: 'include', // Important for cookies
       });
       const data = await response.json();
@@ -37,12 +40,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = () => {
     // Redirect to backend login endpoint
-    window.location.href = 'http://127.0.0.1:8888/login';
+    window.location.href = `${BACKEND_URL}/login`;
   };
 
   const logout = async () => {
     try {
-      await fetch('http://127.0.0.1:8888/auth/logout', {
+      await fetch(`${BACKEND_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -54,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const getAccessToken = async (): Promise<string | null> => {
     try {
-      const response = await fetch('http://127.0.0.1:8888/auth/token', {
+      const response = await fetch(`${BACKEND_URL}/auth/token`, {
         credentials: 'include',
       });
       
@@ -70,12 +73,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // After authentication, verify premium status once
+  useEffect(() => {
+    if (isAuthenticated) {
+      (async () => {
+        await getSpotifyUser();
+      })();
+    }
+  }, [isAuthenticated]);
+
   const getSpotifyUser = async (): Promise<SpotifyUser | null> => {
     if (!isAuthenticated) return null;
     
     try {
-      return await backendGetSpotifyUser();
-    } catch (error) {
+      const user = await backendGetSpotifyUser();
+      // If successful, ensure premium flag is cleared
+      setRequiresPremium(false);
+      return user;
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === 'premium_required') {
+        setRequiresPremium(true);
+      }
       console.error('Error fetching Spotify user:', error);
       return null;
     }
@@ -93,10 +111,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logout,
         getAccessToken,
         getSpotifyUser,
+        requiresPremium,
         isHostOfLobby,
       }}
     >
       {children}
+      {requiresPremium && (
+        <PremiumRequiredModal onClose={() => setRequiresPremium(false)} />
+      )}
     </AuthContext.Provider>
   );
 };
