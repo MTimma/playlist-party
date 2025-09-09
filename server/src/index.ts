@@ -41,7 +41,7 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Monitor lobby status changes and stop watchers when games end
+// Monitor lobby status changes and stop watchers when parties end
 const setupLobbyStatusMonitoring = () => {
   const lobbiesRef = db.collection('lobbies');
   
@@ -337,7 +337,7 @@ app.get('/me', (async (req, res) => {
 }) as RequestHandler);
 
 // 7. Store host's Spotify access token
-app.post('/api/game/:lobbyId/host-token', (async (req, res) => {
+app.post('/api/party/:lobbyId/host-token', (async (req, res) => {
   console.log('=== Store Host Token Request ===');
   console.log('Lobby ID:', req.params.lobbyId);
   console.log('Request body:', req.body);
@@ -582,7 +582,7 @@ app.get('/api/spotify/search', searchLimiter, (async (req, res) => {
 const guessRateLimit = new Map<string, number>();
 
 // 10. Get track owner for validation (server only) - WITH TRANSACTION PROTECTION
-app.post('/api/game/validate-guess', (async (req, res) => {
+app.post('/api/party/validate-guess', (async (req, res) => {
   console.log('=== Guess Validation Request ===');
   console.log('Request body:', req.body);
   
@@ -720,7 +720,7 @@ app.post('/api/game/validate-guess', (async (req, res) => {
 }) as RequestHandler);
 
 // Check if a player has already guessed for a specific track
-app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
+app.get('/api/party/:lobbyId/guess/:trackUri', (async (req, res) => {
   try {
     const { lobbyId, trackUri } = req.params;
     const { playerId } = req.query;
@@ -765,7 +765,7 @@ app.get('/api/game/:lobbyId/guess/:trackUri', (async (req, res) => {
 }) as RequestHandler);
 
 // 11. End game and archive results
-app.post('/api/game/:lobbyId/end', (async (req, res) => {
+app.post('/api/party/:lobbyId/end', (async (req, res) => {
   try {
     const { lobbyId } = req.params;
     const { autoEnd } = req.body; // Flag to indicate if this is an auto-end due to all tracks guessed

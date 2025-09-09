@@ -47,7 +47,7 @@ export const Lobby = () => {
             
             // Navigate to game when status changes to 'in_progress'
             if (lobbyData.status === 'in_progress') {
-              navigate(`/game/${lobbyId}`);
+              navigate(`/party/${lobbyId}`);
             }
           } else {
             setError('Lobby not found');

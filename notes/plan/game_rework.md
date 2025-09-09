@@ -12,7 +12,7 @@ Sketch of the architecture
 Apply to TrackInfo.ts...
 status
 Implementation outline in Node/Express (no code yet)
-When the host calls POST /api/spotify/playlist or POST /game/:id/start, create a watcher:
+When the host calls POST /api/spotify/playlist or POST /party/:id/start, create a watcher:
 Store { lobbyId, hostAccessToken, refreshToken, startedAt } in memory (or a DB).
 setInterval every 1 000 ms:
 Call GET https://api.spotify.com/v1/me/player/currently-playing.
@@ -77,7 +77,7 @@ maintains an internal Map<lobbyId, { timer, pauseUntil, accessToken, refreshToke
 hard-cap max concurrent watchers (e.g. 500) – log & refuse if exceeded
 1.2 All HTTP/Spotify calls use axios with 5 s timeout.
 Wire it into an existing backend endpoint
-In the POST /api/spotify/playlist handler (or a new POST /game/:id/start)
+In the POST /api/spotify/playlist handler (or a new POST /party/:id/start)
 after the playlist is successfully created, call
 watcherManager.startWatcher(lobbyId, accessToken, refreshToken)
 store { hostAccessToken, hostRefreshToken } in Firestore for crash-recovery.

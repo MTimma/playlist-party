@@ -374,7 +374,7 @@ export const initializeGameStateInLobby = async (
 };
 
 export const createGame = async (host: Player): Promise<string> => {
-  const gameRef = doc(collection(db, 'games'));
+  const gameRef = doc(collection(db, 'parties'));
   const gameId = gameRef.id;
   
   const gameState: LegacyGameState = {
@@ -393,7 +393,7 @@ export const createGame = async (host: Player): Promise<string> => {
 };
 
 export const joinGame = async (gameId: string, player: Player) => {
-  const gameRef = doc(db, 'games', gameId);
+  const gameRef = doc(db, 'parties', gameId);
   const gameDoc = await getDoc(gameRef);
   
   if (gameDoc.exists()) {
@@ -406,7 +406,7 @@ export const joinGame = async (gameId: string, player: Player) => {
 };
 
 export const addSong = async (gameId: string, song: Song) => {
-  const gameRef = doc(db, 'games', gameId);
+  const gameRef = doc(db, 'parties', gameId);
   const gameDoc = await getDoc(gameRef);
   
   if (gameDoc.exists()) {
@@ -680,7 +680,7 @@ export const subscribePlayerScores = (
   lobbyId: string,
   callback: (scores: PlayerScore[]) => void
 ) => {
-  const scoresRef = collection(db, 'games', lobbyId, 'scores');
+  const scoresRef = collection(db, 'parties', lobbyId, 'scores');
   
   return onSnapshot(scoresRef, (snapshot) => {
     const scores: PlayerScore[] = [];

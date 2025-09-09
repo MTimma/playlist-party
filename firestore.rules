@@ -80,12 +80,12 @@ service cloud.firestore {
     }
     
     // Game state rules (legacy)
-    match /games/{gameId} {
+    match /parties/{gameId} {
       allow read, write: if request.auth != null;
     }
     
     // NEW - Game state management rules (Phase 4)
-    match /games/{lobbyId}/state/{stateId} {
+    match /parties/{lobbyId}/state/{stateId} {
       // All players in the lobby can read game state
       allow read: if request.auth != null 
         && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
@@ -104,7 +104,7 @@ service cloud.firestore {
     }
     
     // Player scores rules
-    match /games/{lobbyId}/scores/{playerId} {
+    match /parties/{lobbyId}/scores/{playerId} {
       // All players in the lobby can read scores
       allow read: if request.auth != null 
         && exists(/databases/$(database)/documents/lobbies/$(lobbyId))
@@ -122,7 +122,7 @@ service cloud.firestore {
     }
     
     // Guess submission rules
-    match /games/{lobbyId}/guesses/{guessId} {
+    match /parties/{lobbyId}/guesses/{guessId} {
       // All players in the lobby can read guesses (for real-time updates)
       allow read: if request.auth != null 
         && exists(/databases/$(database)/documents/lobbies/$(lobbyId))

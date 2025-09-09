@@ -104,7 +104,7 @@ All secrets (Spotify tokens) remain server-side; functions use environment varia
 ## Components (Frontend)
 | Component | Location | Responsibility |
 |-----------|----------|----------------|
-| `Game/` | `src/components/Game/` | Container route, renders child components based on `GameState`. |
+| `Game/` | `src/components/party/` | Container route, renders child components based on `GameState`. |
 | `TrackInfo/` | `src/components/TrackInfo/` | Displays current track details & progress. |
 | `GuessButtons/` | `src/components/GuessButtons/` | Renders dynamic buttons for guessing; disables after selection. |
 | `ScoreBoard/` | `src/components/ScoreBoard/` | Real-time player points list. |

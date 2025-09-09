@@ -10,11 +10,11 @@ import {
 import { validateGuess, checkPlayerGuess, endGame } from '../../services/backend';
 import { TrackInfo } from '../TrackInfo/TrackInfo';
 import { GuessButtons } from '../GuessButtons/GuessButtons';
-import { EndGameSummary } from '../EndGameSummary/EndGameSummary';
+import { EndPartySummary } from '../EndPartySummary/EndPartySummary';
 import type { Track, PlaylistCollection, Lobby, GameResult } from '../../types/types';
-import './Game.css';
+import './Party.css';   
 
-export const Game = () => {
+export const Party = () => {
   const { lobbyId } = useParams<{ lobbyId: string }>();
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [lobby, setLobby] = useState<Lobby | null>(null);
@@ -343,7 +343,7 @@ export const Game = () => {
   if (!lobby || lobby.status !== 'in_progress') {
     // If lobby doc gone but we have game result, show summary
     if (gameResult) {
-      return <EndGameSummary result={gameResult} currentUserId={currentUserId} />;
+      return <EndPartySummary result={gameResult} currentUserId={currentUserId} />;
     }
     return (
       <div className="game-container">

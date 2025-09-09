@@ -1,13 +1,13 @@
 import React from 'react';
-import type { GameResult } from '../../types/types';
-import './EndGameSummary.css';
+import type { GameResult as PartyResult } from '../../types/types';
+import './EndPartySummary.css';
 
 interface Props {
-  result: GameResult;
+  result: PartyResult;
   currentUserId?: string | null;
 }
 
-export const EndGameSummary: React.FC<Props> = ({ result, currentUserId }) => {
+export const EndPartySummary: React.FC<Props> = ({ result, currentUserId }) => {
   const { finalScores, players, winnerIds, autoEnded } = result;
 
   const sorted = Object.entries(finalScores)

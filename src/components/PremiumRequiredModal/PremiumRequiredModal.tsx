@@ -11,7 +11,7 @@ const PremiumRequiredModal: React.FC<PremiumRequiredModalProps> = ({ onClose }) 
       <div className="premium-modal">
         <h2 className="premium-modal-title">Spotify Premium Required</h2>
         <p className="premium-modal-text">
-          Music Game uses the Spotify Web Playback SDK which is only available for Premium
+          Playlist Partyuses the Spotify Web Playback SDK which is only available for Premium
           accounts. Please upgrade to Spotify Premium or log in with a Premium account to
           continue.
         </p>
@@ -34,4 +34,6 @@ const PremiumRequiredModal: React.FC<PremiumRequiredModalProps> = ({ onClose }) 
 };
 
 export default PremiumRequiredModal;
+
+
 

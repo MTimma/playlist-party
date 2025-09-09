@@ -13,7 +13,7 @@ export const validateGuess = async (
   trackUri: string,
   guessedOwnerId: string
 ): Promise<{ isCorrect: boolean; correctOwnerId?: string; correctOwnerName?: string; scoreChange: number }> => {
-  const response = await fetch(`${BACKEND_URL}/api/game/validate-guess`, {
+  const response = await fetch(`${BACKEND_URL}/api/party/validate-guess`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ export const checkPlayerGuess = async (
   trackUri: string
 ): Promise<{ hasGuessed: boolean; guess?: { id: string; playerId: string; trackUri: string; guessedOwnerId: string; isCorrect: boolean; createdAt: Date } }> => {
   const response = await fetch(
-    `${BACKEND_URL}/api/game/${lobbyId}/guess/${encodeURIComponent(trackUri)}?playerId=${playerId}`,
+    `${BACKEND_URL}/api/party/${lobbyId}/guess/${encodeURIComponent(trackUri)}?playerId=${playerId}`,
     {
       method: 'GET',
       credentials: 'include'
@@ -63,7 +63,7 @@ export const storeHostToken = async (
   accessToken: string,
   spotifyUserId: string
 ): Promise<void> => {
-  const response = await fetch(`${BACKEND_URL}/api/game/${lobbyId}/host-token`, {
+  const response = await fetch(`${BACKEND_URL}/api/party/${lobbyId}/host-token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ export const getSpotifyUser = async (): Promise<SpotifyUser> => {
 
 // End game (host only)
 export const endGame = async (lobbyId: string, autoEnd: boolean = false): Promise<void> => {
-  const response = await fetch(`${BACKEND_URL}/api/game/${lobbyId}/end`, {
+  const response = await fetch(`${BACKEND_URL}/api/party/${lobbyId}/end`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
