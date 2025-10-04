@@ -44,7 +44,7 @@ export const ReadyButton = ({ isReady, onToggleReady, disabled = false }: ReadyB
             )}
           </div>
           <span className="ready-text">
-            {isReady ? 'Ready!' : 'Mark Ready'}
+            {isReady ? 'Ready!' : 'Press to ready'}
           </span>
         </>
       )}

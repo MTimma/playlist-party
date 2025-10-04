@@ -13,6 +13,7 @@ import {
   deleteDoc,
   increment,
   runTransaction,
+  deleteField,
   connectFirestoreEmulator
 } from 'firebase/firestore';
 import { 
@@ -301,7 +302,7 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
     credentials: 'include', // Include cookies for authentication
     body: JSON.stringify({
       name: playlistName,
-      description: `Playlist created for Music Game lobby ${lobbyId} with ${players.length} players`,
+      description: `Playlist created for Playlist Party lobby ${lobbyId} with ${players.length} players`,
       trackUris: trackUris,
       lobbyId
     })
@@ -616,6 +617,61 @@ export const addTrackToPlaylist = async (
   });
 }
 
+export const removeTrackFromPlaylist = async (
+  lobbyId: string,
+  trackUri: string,
+  requesterId: string
+): Promise<void> => {
+  const playlistRef = doc(db, 'playlists', lobbyId);
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+
+  await runTransaction(db, async (tx) => {
+    const [playlistSnap, lobbySnap] = await Promise.all([
+      tx.get(playlistRef),
+      tx.get(lobbyRef)
+    ]);
+
+    if (!playlistSnap.exists()) {
+      throw new Error('Playlist not found');
+    }
+
+    const playlistData = playlistSnap.data() as PlaylistCollection;
+    const songEntry = (playlistData.songs || {})[trackUri] as { addedBy: string; trackInfo: Track; addedAt: unknown } | undefined;
+    if (!songEntry) {
+      throw new Error('Track not in playlist');
+    }
+
+    const isOwner = songEntry.addedBy === requesterId;
+    let isHost = false;
+    if (lobbySnap.exists()) {
+      const lobbyData = lobbySnap.data() as Lobby;
+      isHost = lobbyData.hostFirebaseUid === requesterId;
+    }
+
+    if (!isOwner && !isHost) {
+      throw new Error('Not authorized to remove this track');
+    }
+
+    // Remove the song atomically and decrement stats
+    const isOwnersOnlySong = Object.values(playlistData.songs || {})
+      .filter((s: { addedBy: string }) => s.addedBy === songEntry.addedBy)
+      .length === 1;
+
+    tx.update(playlistRef, {
+      [`songs.${trackUri}`]: deleteField(),
+      'stats.totalSongs': increment(-1),
+      ...(isOwnersOnlySong ? { 'stats.playersWithSongs': increment(-1) } : {}),
+    });
+
+    // If this was the requester's last song, update lobby flag
+    if (isOwner && isOwnersOnlySong) {
+      tx.update(lobbyRef, {
+        [`players.${requesterId}.hasAddedSongs`]: false,
+      });
+    }
+  });
+};
+
 export const subscribePlaylistCollection = (
   lobbyId: string, 
   callback: (collection: PlaylistCollection | null) => void
@@ -703,11 +759,11 @@ export const subscribeUserSongs = (
   const ref = doc(db, 'playlists', lobbyId);
   return onSnapshot(ref, snap => {
     if (!snap.exists()) { cb([]); return; }
-    const songs = snap.data().songs ?? {};
+    const songs: PlaylistCollection['songs'] = (snap.data().songs ?? {}) as PlaylistCollection['songs'];
     cb(
       Object.values(songs)
-        .filter((s: any) => s.addedBy === userId)
-        .map((s: any) => ({ ...s.trackInfo } as Track))
+        .filter((s) => s.addedBy === userId)
+        .map((s) => ({ ...s.trackInfo } as Track))
     );
   });
 };
@@ -733,18 +789,66 @@ export const verifyHostStatus = async (lobbyId: string): Promise<boolean> => {
 export const subscribeGameResult = (
   lobbyId: string,
   callback: (result: import('../types/types').GameResult | null) => void
-) => {
-  const resultRef = doc(db, 'game_results', lobbyId);
-  return onSnapshot(resultRef, (docSnap) => {
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      const result: import('../types/types').GameResult = {
-        ...data,
-        endedAt: data.endedAt?.toDate?.() || new Date()
-      } as any;
-      callback(result);
-    } else {
-      callback(null);
+): (() => void) => {
+  const resultRef = doc(db, 'party_results', lobbyId);
+  let isActive = true;
+  let innerUnsub: (() => void) | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let delayMs = 500;
+  const maxDelayMs = 5000;
+
+  const start = () => {
+    if (!isActive) return;
+    try {
+      innerUnsub = onSnapshot(resultRef, (docSnap) => {
+        // Reset backoff on any event
+        delayMs = 500;
+        if (!isActive) return;
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const result: import('../types/types').GameResult = {
+            ...data,
+            endedAt: (data.endedAt && typeof (data.endedAt as { toDate?: () => Date }).toDate === 'function')
+              ? (data.endedAt as { toDate: () => Date }).toDate()
+              : (data.endedAt as Date | undefined) || new Date()
+          } as import('../types/types').GameResult;
+          callback(result);
+        } else {
+          callback(null);
+        }
+      }, (error) => {
+        // On error, schedule a retry with backoff
+        if (!isActive) return;
+        console.warn('subscribeGameResult snapshot error:', error);
+        if (innerUnsub) {
+          try { innerUnsub(); } catch { /* no-op */ }
+          innerUnsub = null;
+        }
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => {
+          delayMs = Math.min(delayMs * 2, maxDelayMs);
+          start();
+        }, delayMs);
+      });
+    } catch (err) {
+      // On setup failure, schedule a retry
+      if (!isActive) return;
+      console.warn('subscribeGameResult setup error:', err);
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        delayMs = Math.min(delayMs * 2, maxDelayMs);
+        start();
+      }, delayMs);
     }
-  });
+  };
+
+  start();
+
+  return () => {
+    isActive = false;
+    if (retryTimer) clearTimeout(retryTimer);
+    if (innerUnsub) {
+      try { innerUnsub(); } catch { /* no-op */ }
+    }
+  };
 };

@@ -16,7 +16,7 @@ export const PlaylistNameDialog = ({
   onConfirm, 
   onCancel 
 }: PlaylistNameDialogProps) => {
-  const [playlistName, setPlaylistName] = useState(defaultName || `Music Game - Lobby ${lobbyId}`);
+  const [playlistName, setPlaylistName] = useState(defaultName || `Playlist Party - Lobby ${lobbyId}`);
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 

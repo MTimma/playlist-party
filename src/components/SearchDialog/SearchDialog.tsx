@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { debounce } from 'lodash';
-import { addTrackToPlaylist, subscribePlaylistCollection } from '../../services/firebase';
+import { addTrackToPlaylist, subscribePlaylistCollection, removeTrackFromPlaylist, verifyHostStatus } from '../../services/firebase';
 import type { Track, PlaylistCollection } from '../../types/types';
 import './SearchDialog.css';
 import TrackInfoCard from '../TrackInfoCard/TrackInfoCard';
@@ -23,6 +23,7 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
   const [isSearching, setIsSearching] = useState(false);
   const [playlistData, setPlaylistData] = useState<PlaylistCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState<boolean>(false);
 
   // Subscribe to playlist collection to check for duplicates
   useEffect(() => {
@@ -98,6 +99,20 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
     [playlistData, currentUserId]
   );
 
+  // Check if current user is host for removal rights UI
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const result = await verifyHostStatus(lobbyId);
+        if (active) setIsHost(result);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { active = false; };
+  }, [lobbyId]);
+
   // Trigger search when query changes
   useEffect(() => {
     debouncedSearch(query);
@@ -142,6 +157,17 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
     }
   };
 
+  const handleRemoveTrack = async (track: SearchResult) => {
+    if (!track.isDuplicate) return;
+    try {
+      await removeTrackFromPlaylist(lobbyId, track.uri, currentUserId);
+      setSearchResults(prev => prev.map(r => r.uri === track.uri ? { ...r, isDuplicate: false, addedBy: null, isAddedByCurrentUser: false } : r));
+    } catch (err) {
+      console.error('Error removing track:', err);
+      setError('Failed to remove track.');
+    }
+  };
+
   const playPreview = (previewUrl: string, event: React.MouseEvent) => {
     // Stop propagation to prevent triggering row click
     event.stopPropagation();
@@ -158,16 +184,16 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
     if (!track.isDuplicate) return null;
     
     if (track.isAddedByCurrentUser) {
-      return { text: 'Added by you', className: 'added-by-user' };
+      return { text: '', className: 'added-by-user' };
     } else {
-      return { text: 'Already added', className: 'added-by-other' };
+      return { text: 'Already picked', className: 'added-by-other' };
     }
   };
 
   return (
     <div className="search-dialog">
       <div className="search-section">
-        <h4>Add your favorite songs to the playlist!</h4>
+        <h4>Pick songs for the party!</h4>
         
         <div className="search-input-container">
           <input
@@ -224,9 +250,18 @@ export const SearchDialog = ({ lobbyId, currentUserId }: SearchDialogProps) => {
                     statusText={status?.text || null}
                     statusVariant={status?.className as 'added-by-user' | 'added-by-other' | undefined}
                     isDisabled={!isClickable}
-                    onClick={() => isClickable && handleAddTrack(track)}
+                    onClick={() => {
+                      if (!isClickable) return;
+                      if (track.isDuplicate && track.isAddedByCurrentUser) {
+                        handleRemoveTrack(track);
+                      } else {
+                        handleAddTrack(track);
+                      }
+                    }}
                     hasPreview={!!track.preview_url}
-                    onPreview={(e) => track.preview_url && playPreview(track.preview_url, e)}
+                    onPreview={(ev) => track.preview_url && playPreview(track.preview_url, ev)}
+                    showRemove={track.isDuplicate && (track.isAddedByCurrentUser || isHost)}
+                    onRemove={() => handleRemoveTrack(track)}
                   />
                 </div>
               );

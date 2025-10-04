@@ -205,7 +205,7 @@
   flex-shrink: 0;
 }
 
-.preview-btn,
+.remove-btn,
 .add-btn {
   width: 40px;
   height: 40px;
@@ -218,12 +218,12 @@
   transition: all 0.2s ease;
 }
 
-.preview-btn {
+.remove-btn {
   background: rgba(255, 255, 255, 0.1);
   color: white;
 }
 
-.preview-btn:hover {
+.remove-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   transform: scale(1.05);
 }
@@ -392,7 +392,7 @@
   }
   .track-details { line-height: 1.15; }
   .track-actions { gap: 0.5rem; }
-  .preview-btn, .add-btn { width: 34px; height: 34px; }
+  .remove-btn, .add-btn { width: 34px; height: 34px; }
   .add-icon { width: 34px; height: 34px; }
   
   .search-result-item:hover:not(.disabled) {

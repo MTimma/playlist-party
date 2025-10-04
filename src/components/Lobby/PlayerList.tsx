@@ -9,7 +9,34 @@ interface PlayerListProps {
 }
 
 export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListProps) => {
-  const playerArray = Object.values(players);
+  const toDate = (joinedAt: Date | Timestamp | string | number | undefined): Date => {
+    if (!joinedAt) return new Date(0);
+    if (joinedAt && typeof joinedAt === 'object' && 'toDate' in joinedAt) {
+      // Firestore Timestamp
+      return joinedAt.toDate();
+    }
+    if (joinedAt instanceof Date) return joinedAt;
+    if (typeof joinedAt === 'string' || typeof joinedAt === 'number') return new Date(joinedAt);
+    return new Date(0);
+  };
+
+  const playerArray = Object.values(players).sort((a, b) => {
+    // 1) Host first
+    if (a.isHost && !b.isHost) return -1;
+    if (!a.isHost && b.isHost) return 1;
+
+    // 2) By join time (ascending)
+    const ad = toDate(a.joinedAt).getTime();
+    const bd = toDate(b.joinedAt).getTime();
+    if (ad !== bd) return ad - bd;
+
+    // 3) By name (locale, ascending)
+    const nameCmp = (a.name || '').localeCompare(b.name || '');
+    if (nameCmp !== 0) return nameCmp;
+
+    // 4) Tiebreaker by id (ascending) for stability
+    return (a.id || '').localeCompare(b.id || '');
+  });
   const currentPlayerCount = playerArray.length;
 
   const formatJoinTime = (joinedAt: Date | Timestamp) => {

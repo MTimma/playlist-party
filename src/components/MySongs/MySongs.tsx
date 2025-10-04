@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { subscribeUserSongs } from '../../services/firebase';
+import { subscribeUserSongs, removeTrackFromPlaylist } from '../../services/firebase';
 import type { Track } from '../../types/types';
 import './MySongs.css';
 
@@ -43,7 +43,7 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
       {/* <div className="my-songs-header" onClick={() => setIsExpanded(!isExpanded)}> */}
       <div className="my-songs-header" >
         <div className="header-content">
-          My songs
+          Your songs
         </div>
         {/* <button className="expand-button" aria-label={isExpanded ? 'Collapse' : 'Expand'}>
           <svg 
@@ -82,6 +82,24 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
                 <div className="song-name">{track.name}</div>
                 <div className="song-artist">{formatArtists(track.artists)}</div>
               </div>
+
+              <button
+                type="button"
+                className="remove-btn"
+                aria-label="Remove from playlist"
+                title="Remove from playlist"
+                onClick={async () => {
+                  try {
+                    await removeTrackFromPlaylist(lobbyId, track.uri, userId);
+                  } catch (e) {
+                    console.error('Failed to remove track', e);
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm3-9h2v7H9V10zm4 0h2v7h-2V10zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                </svg>
+              </button>
 
               {/* <div className="song-status">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="status-icon approved">

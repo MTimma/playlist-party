@@ -138,7 +138,7 @@ service cloud.firestore {
       // No direct updates allowed from clients
     }
 
-    match /game_results/{lobbyId} {
+    match /party_results/{lobbyId} {
       // Any authenticated user that is listed in the result can read it
       allow read: if request.auth != null
                   && (request.auth.uid in resource.data.players.keys());

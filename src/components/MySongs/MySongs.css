@@ -250,3 +250,18 @@
     font-size: 0.7rem;
   }
 } 
+.my-songs-list .remove-btn {
+  width: 50px;
+  font-size: 0px;
+}
+
+.preview-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

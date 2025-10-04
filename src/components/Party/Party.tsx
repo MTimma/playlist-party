@@ -32,7 +32,7 @@ export const Party = () => {
   const [correctlyGuessedTracks, setCorrectlyGuessedTracks] = useState<Record<string, boolean>>({});
   const [guessFeedback, setGuessFeedback] = useState<{ type: 'correct' | 'incorrect'; message: string } | null>(null);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
-  
+  const [isEndingGame, setIsEndingGame] = useState(false);
   // Ensure the user is authenticated and keep uid in state
   useEffect(() => {
     let isMounted = true;
@@ -203,6 +203,7 @@ export const Party = () => {
     const unsub = subscribeGameResult(lobbyId, (res) => {
       setGameResult(res);
       setLoading(false); //When opening game that has ended
+      setIsEndingGame(false); // Clear ending state when result is received
     });
     return () => unsub();
   }, [lobbyId]);
@@ -210,10 +211,16 @@ export const Party = () => {
   const handleEndGameClick = async () => {
     if (!lobbyId) return;
     if (!window.confirm('End the game for all players?')) return;//TODO change to a modal
+    
+    setIsEndingGame(true);
     try {
       await endGame(lobbyId);
-    } catch (err: any) {
-      alert(err.message || 'Failed to end game');
+      // Give Firebase subscription time to receive the gameResult
+      // The gameResult subscription will automatically show the scoreboard
+    } catch (err) {
+      setIsEndingGame(false);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to end game';
+      alert(errorMessage);
     }
   };
 
@@ -315,12 +322,12 @@ export const Party = () => {
   };
 
   // Handle loading state
-  if (loading) {
+  if (loading || isEndingGame) {
     return (
       <div className="game-container">
         <div className="loading">
           <div className="loading-spinner"></div>
-          <p>Loading game...</p>
+          <p>{isEndingGame ? 'Ending game...' : 'Loading game...'}</p>
         </div>
       </div>
     );
@@ -345,11 +352,23 @@ export const Party = () => {
     if (gameResult) {
       return <EndPartySummary result={gameResult} currentUserId={currentUserId} />;
     }
+    // If we're in the process of ending the game, keep showing loading
+    // to avoid race condition where lobby is deleted before gameResult arrives
+    if (isEndingGame) {
+      return (
+        <div className="game-container">
+          <div className="loading">
+            <div className="loading-spinner"></div>
+            <p>Ending party...</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="game-container">
         <div className="waiting">
-          <h2>Game Not Started</h2>
-          <p>The game hasn't started yet. Please wait for the host to begin.</p>
+          <h2>Party Not Started</h2>
+          <p>The party hasn't started yet. Please wait for the host to begin.</p>
         </div>
       </div>
     );
@@ -358,13 +377,11 @@ export const Party = () => {
   return (
     <div className="game-container">
       <div className="game-header">
-        <h1>Music Guessing Game</h1>
         <div className="round-info">
-          <span>Game in Progress</span>
         </div>
         {lobby?.hostFirebaseUid === currentUserId && (
           <button className="end-game-btn" onClick={handleEndGameClick}>
-            End Game
+            End Party!
           </button>
         )}
       </div>

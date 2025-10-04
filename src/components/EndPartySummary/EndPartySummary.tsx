@@ -18,23 +18,26 @@ export const EndPartySummary: React.FC<Props> = ({ result, currentUserId }) => {
     }))
     // Sort players alphabetically by name
     .sort((a, b) => a.name.localeCompare(b.name));
+  
+      // Guard against undefined winnerIds to avoid runtime errors during render
+  const winnerIdSet = new Set(winnerIds ?? []);
 
   return (
     <div className="endgame-summary">
-      <h2>Game Over!</h2>
+      <h2>Party Over!</h2>
       {autoEnded && (
         <p className="auto-end-message">🎉 All songs have been correctly guessed!</p>
       )}
       {winnerIds && winnerIds.length > 0 && (
         <div className="winner-announcement">
-          🏆 Winner{winnerIds.length > 1 ? 's' : ''}: {winnerIds.map((id) => players?.[id]?.name || 'Unknown').join(', ')}
+          Correct Guesses:
         </div>
       )}
       <div className="scoreboard">
         {sorted.map(({ playerId, name, score }) => (
           <div
             key={playerId}
-            className={`score-item ${winnerIds.includes(playerId) ? 'winner' : ''} ${playerId === currentUserId ? 'me' : ''}`}
+            className={`score-item ${winnerIdSet.has(playerId) ? 'winner' : ''} ${playerId === currentUserId ? 'me' : ''}`}
           >
             <span className="player-name">{name}{playerId === currentUserId ? ' (You)' : ''}</span>
             <span className="score">{score}</span>

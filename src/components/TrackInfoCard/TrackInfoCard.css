@@ -98,11 +98,11 @@
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-.track-info-card__preview-btn {
+.track-info-card__remove-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 50px;
   height: 32px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.12);
@@ -110,11 +110,11 @@
   transition: background 0.2s ease, transform 0.06s ease;
 }
 
-.track-info-card__preview-btn:hover {
+.track-info-card__remove-btn:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
-.track-info-card__preview-btn:active {
+.track-info-card__remove-btn:active {
   transform: scale(0.98);
 }
 

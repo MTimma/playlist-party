@@ -249,28 +249,29 @@ export const Lobby = () => {
         {lobby.status === 'collecting_songs' && (<>
             
         
-            <MySongs 
-                lobbyId={lobbyId!}
-                userId={currentUserId}
-              />
-              
+            
             {/* Search dialog for all players */}
             <SearchDialog 
               lobbyId={lobbyId!}
               currentUserId={currentUserId}
             />
+            <MySongs 
+                lobbyId={lobbyId!}
+                userId={currentUserId}
+              />
+              
             {/* Ready button for all players */}
             {getCurrentPlayer() && (
               <div className="ready-section">
+                {!getCurrentPlayer()?.isReady && (
+                  <p className="ready-hint">
+                    Mark yourself ready once done
+                  </p>
+                )}
                 <ReadyButton
                   isReady={getCurrentPlayer()?.isReady || false}
                   onToggleReady={handleToggleReady}
                 />
-                {!getCurrentPlayer()?.isReady && (
-                  <p className="ready-hint">
-                    Mark yourself ready once you've added all your songs
-                  </p>
-                )}
               </div>
             )}
         <div className="readiness-summary">
