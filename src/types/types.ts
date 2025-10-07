@@ -7,6 +7,8 @@ export interface Player {
   joinedAt: Date | Timestamp;
   score: number;
   avatarUrl?: string;
+  avatarType?: 'initials' | 'preset';
+  avatarPresetId?: string;
   hasAddedSongs?: boolean;
   isReady?: boolean;  // NEW - Player readiness for game start
 }
@@ -80,6 +82,12 @@ export interface PlaylistCollection {
       addedBy: string;
       trackInfo: Track;
       addedAt: Date | Timestamp;
+      comment?: {
+        text: string;
+        promptKey?: string;
+        updatedAt: Date | Timestamp;
+        createdBy: string;
+      };
     };
   };
   stats: {

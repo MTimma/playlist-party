@@ -422,6 +422,19 @@ export const updateGameState = async (lobbyId: string, updates: Partial<Lobby>) 
   await updateDoc(lobbyRef, updates);
 };
 
+export const updatePlayerAvatar = async (
+  lobbyId: string,
+  playerId: string,
+  avatar: { avatarType: 'initials' | 'preset'; avatarPresetId?: string; avatarUrl?: string }
+): Promise<void> => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  await updateDoc(lobbyRef, {
+    [`players.${playerId}.avatarType`]: avatar.avatarType,
+    ...(avatar.avatarPresetId ? { [`players.${playerId}.avatarPresetId`]: avatar.avatarPresetId } : {}),
+    ...(avatar.avatarUrl ? { [`players.${playerId}.avatarUrl`]: avatar.avatarUrl } : {}),
+  });
+};
+
 // Track Proposal functions
 export const addTrackProposal = async (
   lobbyId: string, 
@@ -668,6 +681,23 @@ export const removeTrackFromPlaylist = async (
       tx.update(lobbyRef, {
         [`players.${requesterId}.hasAddedSongs`]: false,
       });
+    }
+  });
+};
+
+export const updateTrackComment = async (
+  lobbyId: string,
+  trackUri: string,
+  comment: { text: string; promptKey?: string },
+  createdBy?: string
+): Promise<void> => {
+  const playlistRef = doc(db, 'playlists', lobbyId);
+  await updateDoc(playlistRef, {
+    [`songs.${trackUri}.comment`]: {
+      text: comment.text,
+      promptKey: comment.promptKey || null,
+      updatedAt: serverTimestamp(),
+      createdBy: createdBy || (getCurrentUser()?.uid || 'unknown')
     }
   });
 };

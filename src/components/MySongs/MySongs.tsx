@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { subscribeUserSongs, removeTrackFromPlaylist } from '../../services/firebase';
+import { subscribeUserSongs, removeTrackFromPlaylist, updateTrackComment } from '../../services/firebase';
 import type { Track } from '../../types/types';
 import './MySongs.css';
 
@@ -10,7 +10,10 @@ interface MySongsProps {
 
 export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded] = useState(true);
+  const [activeCommentUri, setActiveCommentUri] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState<string>('');
+  const [commentPrompt, setCommentPrompt] = useState<string>('');
 
   useEffect(() => {
     const unsubscribe = subscribeUserSongs(lobbyId, userId, (userTracks) => {
@@ -61,7 +64,8 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
       {isExpanded && (
         <div className="my-songs-list">
           {tracks.map((track) => (
-            <div key={track.uri} className="song-item">
+            <div className="song-item-group" key={track.uri}>
+            <div className="song-item">
               <div className="song-album">
                 {track.album.images[0] ? (
                   <img
@@ -82,6 +86,18 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
                 <div className="song-name">{track.name}</div>
                 <div className="song-artist">{formatArtists(track.artists)}</div>
               </div>
+
+              <button
+                type="button"
+                className="preview-btn"
+                aria-label="Add note"
+                title="Add note"
+                onClick={() => { setActiveCommentUri(track.uri); setCommentText(''); setCommentPrompt(''); }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z" />
+                </svg>
+              </button>
 
               <button
                 type="button"
@@ -107,6 +123,34 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
                 </svg>
                 <span className="status-text">Added to playlist</span>
               </div> */}
+            </div>
+
+            {activeCommentUri === track.uri && (
+              <div className="comment-inline">
+                <div className="comment-header">Add a hint</div>
+                <div className="comment-body">
+                  <label className="form-label">Prompt</label>
+                  <select className="form-input" value={commentPrompt} onChange={(e)=>setCommentPrompt(e.target.value)}>
+                    <option value="">(none)</option>
+                    <option value="first_heard">What were you doing when you first heard this song?</option>
+                    <option value="reminds_who">Who does this song remind you of?</option>
+                    <option value="heard_where">Where did you hear it?</option>
+                    <option value="why_special">Why is it special?</option>
+                  </select>
+                  <label className="form-label">Your note</label>
+                  <textarea className="form-input" rows={4} value={commentText} onChange={(e)=>setCommentText(e.target.value)} />
+                </div>
+                <div className="comment-actions">
+                  <button className="btn-secondary" onClick={()=>setActiveCommentUri(null)}>Cancel</button>
+                  <button className="btn-primary" onClick={async ()=>{
+                    try {
+                      await updateTrackComment(lobbyId, track.uri, { text: commentText, promptKey: commentPrompt });
+                      setActiveCommentUri(null);
+                    } catch (e) { console.error('Failed to save note', e); }
+                  }}>Save</button>
+                </div>
+              </div>
+            )}
             </div>
           ))}
         </div>

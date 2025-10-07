@@ -73,6 +73,91 @@ const setupLobbyStatusMonitoring = () => {
 // Start monitoring after a short delay to ensure Firebase is ready
 setTimeout(setupLobbyStatusMonitoring, 1000);
 
+// Auto-end lobbies after 1 hour from startedAt, even if no clients are open
+const setupAutoEndScheduler = () => {
+  const INTERVAL_MS = 60 * 1000; // 1 minute
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+
+  const run = async () => {
+    try {
+      const cutoff = admin.firestore.Timestamp.fromDate(new Date(Date.now() - ONE_HOUR_MS));
+      const snap = await db.collection('lobbies')
+        .where('status', '==', 'in_progress')
+        .where('startedAt', '<=', cutoff)
+        .get();
+
+      if (snap.empty) return;
+
+      for (const docSnap of snap.docs) {
+        const lobbyId = docSnap.id;
+        try {
+          console.log(`[AutoEnd] Lobby ${lobbyId} exceeded 1h. Ending...`);
+
+          // Re-read fresh lobby data
+          const lobbyRef = db.collection('lobbies').doc(lobbyId);
+          const freshSnap = await lobbyRef.get();
+          if (!freshSnap.exists) continue;
+          const lobbyData = freshSnap.data() as {
+            status?: string;
+            playerScores?: Record<string, number>;
+            hostFirebaseUid?: string;
+            startedAt?: admin.firestore.Timestamp | Date | null;
+            createdAt?: admin.firestore.Timestamp | Date | null;
+            players?: Record<string, { name?: string }>;
+            playlistId?: string | null;
+          };
+          if (lobbyData.status !== 'in_progress') continue; // already ended/changed
+
+          // Compute results (mirror endpoint logic)
+          const scores: Record<string, number> = lobbyData.playerScores || {};
+          let maxScore = -Infinity;
+          for (const sc of Object.values(scores)) {
+            if ((sc as number) > maxScore) maxScore = sc as number;
+          }
+          const winnerIds: string[] = Object.entries(scores)
+            .filter(([, sc]) => (sc as number) === maxScore)
+            .map(([pid]) => pid);
+
+          const resultDoc = {
+            lobbyId,
+            hostId: lobbyData.hostFirebaseUid,
+            endedAt: admin.firestore.FieldValue.serverTimestamp(),
+            durationSec: lobbyData.startedAt && lobbyData.createdAt ?
+              Math.floor((
+                ((lobbyData.startedAt instanceof admin.firestore.Timestamp) ? lobbyData.startedAt.toDate() : (lobbyData.startedAt as Date)).getTime() -
+                ((lobbyData.createdAt instanceof admin.firestore.Timestamp) ? lobbyData.createdAt.toDate() : (lobbyData.createdAt as Date)).getTime()
+              )/1000) : null,
+            finalScores: scores,
+            players: lobbyData.players || {},
+            winnerIds,
+            playlistId: lobbyData.playlistId || null,
+            autoEnded: true
+          };
+
+          await db.collection('party_results').doc(lobbyId).set(resultDoc);
+
+          // Stop any active watcher
+          trackWatcherManager.stopWatcher(lobbyId);
+
+          // Delete lobby
+          await lobbyRef.delete();
+
+          console.log(`[AutoEnd] Lobby ${lobbyId} ended and archived.`);
+        } catch (err) {
+          console.error(`[AutoEnd] Failed to end lobby ${lobbyId}:`, err);
+        }
+      }
+    } catch (err) {
+      console.error('[AutoEnd] Scheduler error:', err);
+    }
+  };
+
+  setInterval(run, INTERVAL_MS);
+};
+
+// Start auto-end scheduler shortly after startup
+setTimeout(setupAutoEndScheduler, 1500);
+
 // Validate required environment variables
 const requiredEnvVars = [
   'SPOTIFY_CLIENT_ID',
@@ -675,8 +760,8 @@ app.post('/api/party/validate-guess', (async (req, res) => {
       
       transaction.set(guessRef, guessData);
       
-      // Calculate score change: +1 for correct, -1 for incorrect
-      const scoreChange = isCorrect ? 1 : -1;
+      // Calculate score change: +1 for correct, 0 for incorrect (no penalty)
+      const scoreChange = isCorrect ? 1 : 0;
       
       // Get current player score to ensure it doesn't go below 0
       const currentPlayerScores = lobbyData?.playerScores || {};

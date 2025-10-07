@@ -503,15 +503,77 @@
 
 /* End game button */
 .end-game-btn {
-  margin-left: 1rem;
-  padding: 0.4rem 0.8rem;
-  background: #ff5252;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #7C3AED 0%, #9333EA 100%);
   border: none;
-  border-radius: 4px;
+  border-radius: 999px;
   color: #fff;
   cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35);
+  transition: transform 0.08s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .end-game-btn:hover {
-  background: #ff1744;
+  filter: brightness(1.03);
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.45);
 } 
+
+.end-game-btn:active {
+  transform: translateY(1px);
+}
+
+.end-game-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 1rem;
+}
+
+.end-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 999px;
+  font-weight: 600;
+  color: #fde68a;
+}
+
+.end-timer.expired {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.owner-avatar {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.15);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.owner-mask {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  font-weight: 800;
+}
+
+.owner-mask.revealed {
+  display: none;
+}

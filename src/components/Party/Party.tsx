@@ -33,6 +33,7 @@ export const Party = () => {
   const [guessFeedback, setGuessFeedback] = useState<{ type: 'correct' | 'incorrect'; message: string } | null>(null);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [isEndingGame, setIsEndingGame] = useState(false);
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
   // Ensure the user is authenticated and keep uid in state
   useEffect(() => {
     let isMounted = true;
@@ -186,6 +187,31 @@ export const Party = () => {
     return () => unsubscribe();
   }, [lobbyId, currentTrackUri]);
 
+  // Countdown to auto-end: 1 hour from lobby.startedAt
+  useEffect(() => {
+    if (!lobby || lobby.status !== 'in_progress') { setRemainingMs(null); return; }
+    const startedAtValue = lobby.startedAt as unknown;
+    let startedAtDate: Date | null = null;
+    if (startedAtValue && typeof startedAtValue === 'object' && 'toDate' in (startedAtValue as { toDate?: () => Date })) {
+      startedAtDate = (startedAtValue as { toDate: () => Date }).toDate();
+    } else if (startedAtValue instanceof Date) {
+      startedAtDate = startedAtValue as Date;
+    }
+
+    if (!startedAtDate) { setRemainingMs(null); return; }
+
+    const endAt = new Date(startedAtDate.getTime() + 60 * 60 * 1000);
+
+    const tick = () => {
+      const ms = Math.max(0, endAt.getTime() - Date.now());
+      setRemainingMs(ms);
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [lobby, currentUserId, isEndingGame, lobbyId]);
+
   // Subscribe to playlist collection to get track info
   useEffect(() => {
     if (!lobbyId) return;
@@ -224,10 +250,25 @@ export const Party = () => {
     }
   };
 
+  const formatRemaining = (ms: number | null): string => {
+    if (ms === null) return '';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  };
+
   // Helper function to get track owner (needed for guessing game)
   const getTrackOwner = (trackUri: string): string | null => {
     if (!playlistCollection) return null;
     return playlistCollection.songs[trackUri]?.addedBy || null;
+  };
+
+  const getCurrentComment = (): string | null => {
+    if (!playlistCollection || !currentTrack) return null;
+    return playlistCollection.songs[currentTrack.uri]?.comment?.text || null;
   };
 
   const handleGuess = async (guessedOwnerId: string): Promise<{ isCorrect: boolean; correctOwnerId?: string; correctOwnerName?: string; scoreChange: number }> => {
@@ -380,9 +421,19 @@ export const Party = () => {
         <div className="round-info">
         </div>
         {lobby?.hostFirebaseUid === currentUserId && (
-          <button className="end-game-btn" onClick={handleEndGameClick}>
-            End Party!
-          </button>
+          <div className="end-game-row">
+            <button className="end-game-btn" onClick={handleEndGameClick} disabled={isEndingGame}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-3 7h6v6H9V9z" />
+              </svg>
+              <span>{isEndingGame ? 'Ending…' : 'End Party'}</span>
+            </button>
+            {remainingMs !== null && (
+              <div className={`end-timer ${remainingMs === 0 ? 'expired' : ''}`} title="Auto end in 1 hour from start">
+                ⏳ {formatRemaining(remainingMs)}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -436,6 +487,35 @@ export const Party = () => {
               isPlaying={true}
               startedAt={new Date(lastUpdated.getTime() - progressMs)}
             />
+            {(() => {
+              const startedAt = new Date(lastUpdated.getTime() - progressMs);
+              const elapsedMs = Date.now() - startedAt.getTime();
+              const windowMs = lobby?.guessWindowMs ?? 30000;
+              const isGuessWindowOver = elapsedMs >= windowMs;
+              const ownerId = getTrackOwner(currentTrack.uri);
+              const owner = ownerId ? lobby?.players[ownerId] : null;
+              const note = getCurrentComment();
+              return (
+                <div style={{marginTop:12, display:'flex', flexDirection:'column', gap:8, alignItems:'center'}}>
+                  {note && (
+                    <div style={{background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:8, padding:'8px 12px'}}>
+                      <strong>Song note:</strong> {note}
+                    </div>
+                  )}
+                  <div style={{display:'flex', alignItems:'center', gap:8}}>
+                    {owner ? (
+                      <>
+                        <span>Added by:</span>
+                        <span className="owner-avatar">
+                          <span className={`owner-mask ${isGuessWindowOver ? 'revealed' : ''}`}>{isGuessWindowOver ? '' : '?'}</span>
+                        </span>
+                        <span>{isGuessWindowOver ? owner.name : 'Hidden'}</span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })()}
             
             {(() => {
               // Check if the current track is from the playlist
@@ -446,7 +526,11 @@ export const Party = () => {
               const isTrackSolved = correctlyGuessedTracks[currentTrack.uri] === true;
               
               // Show GuessButtons if all conditions are met
-              if (inPlaylist && !guessingDisabled && !isTrackOwner && !hasGuessed && !isTrackSolved && lobby?.players) {
+              const startedAt = new Date(lastUpdated.getTime() - progressMs);
+              const elapsedMs = Date.now() - startedAt.getTime();
+              const windowMs = lobby?.guessWindowMs ?? 30000;
+              const isGuessWindowOver = elapsedMs >= windowMs;
+              if (inPlaylist && !guessingDisabled && !isTrackOwner && !hasGuessed && !isTrackSolved && lobby?.players && !isGuessWindowOver) {
                 // Sort players alphabetically for consistent button order
                 const sortedPlayers = Object.fromEntries(
                   Object.entries(lobby.players).sort(([, a], [, b]) => 

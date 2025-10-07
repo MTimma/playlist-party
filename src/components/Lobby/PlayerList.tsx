@@ -1,6 +1,7 @@
 import type { Player } from '../../types/types';
 import { Timestamp } from 'firebase/firestore';
 import './PlayerList.css';
+import AvatarCircle from '../Player/AvatarCircle/AvatarCircle';
 
 interface PlayerListProps {
   players: { [playerId: string]: Player };
@@ -102,17 +103,13 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
             }`}
           >
             <div className="player-avatar">
-              {player.avatarUrl ? (
-                <img
-                  src={player.avatarUrl}
-                  alt={`${player.name}'s avatar`}
-                  className="avatar-image"
-                />
-              ) : (
-                <div className="avatar-placeholder">
-                  {getPlayerInitials(player.name)}
-                </div>
-              )}
+              <AvatarCircle
+                name={player.name}
+                avatarType={player.avatarType}
+                avatarPresetId={player.avatarPresetId}
+                avatarUrl={player.avatarUrl}
+                size={40}
+              />
               {player.isHost && (
                 <div className="host-badge">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
