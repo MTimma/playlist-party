@@ -84,9 +84,9 @@ export const CreateLobby = () => {
     return (
       <div className="create-lobby-container">
         <div className="create-lobby-card">
-          <h1 className="create-lobby-title">Create Game Lobby</h1>
+          <h1 className="create-lobby-title">Host a Party!</h1>
           <p className="create-lobby-subtitle">
-            You need a Premium Spotify account to host a game
+            You need a Premium Spotify account to host a party
           </p>
           <button className="spotify-login-btn" onClick={handleSpotifyLogin}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -105,7 +105,7 @@ export const CreateLobby = () => {
   return (
     <div className="create-lobby-container">
       <div className="create-lobby-card">
-        <h1 className="create-lobby-title">Create Game Lobby</h1>
+        <h1 className="create-lobby-title">Host a Party!</h1>
         
         {spotifyUser && (
           <div className="host-info">
@@ -119,7 +119,7 @@ export const CreateLobby = () => {
               )}
               <div>
                 <p className="host-name">Welcome, {spotifyUser.display_name}!</p>
-                <p className="host-subtitle">You'll be hosting this game</p>
+                <p className="host-subtitle">You'll be hosting this party</p>
               </div>
             </div>
           </div>
@@ -128,7 +128,7 @@ export const CreateLobby = () => {
         <div className="create-lobby-form">
           <div className="form-group">
             <label htmlFor="hostName" className="form-label">
-              Your Display Name
+              Your Party Nickname
             </label>
             <input
               id="hostName"

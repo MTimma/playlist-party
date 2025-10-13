@@ -577,3 +577,23 @@
 .owner-mask.revealed {
   display: none;
 }
+
+/* Hint with prompt styling */
+.hint-with-prompt {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hint-prompt {
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+  font-size: 0.9em;
+  font-weight: 400;
+}
+
+.hint-answer {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+}

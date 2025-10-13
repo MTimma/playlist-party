@@ -54,9 +54,9 @@ export const JoinLobby = () => {
   return (
     <div className="join-lobby-container">
       <div className="join-lobby-card">
-        <h1 className="join-lobby-title">Join Game Lobby</h1>
+        <h1 className="join-lobby-title">Join the Party!</h1>
         <p className="join-lobby-subtitle">
-          Enter the lobby details to join the music guessing game
+          Enter the lobby details to join the party
         </p>
 
         <div className="join-lobby-form">
@@ -70,7 +70,7 @@ export const JoinLobby = () => {
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Enter your display name"
+              placeholder="Enter your party nickname"
               className="form-input"
               disabled={isJoining}
               maxLength={30}
@@ -113,22 +113,22 @@ export const JoinLobby = () => {
             {isJoining ? (
               <>
                 <div className="spinner"></div>
-                Joining Lobby...
+                Joining Party...
               </>
             ) : (
-              'Join Lobby'
+              'Join Party'
             )}
           </button>
 
           <div className="join-info">
             <p className="join-text">
-              No Spotify account required to join as a player
+              No Spotify account is required to join
             </p>
           </div>
         </div>
 
         <div className="alternative-action">
-          <p className="alternative-text">Want to host a game instead?</p>
+          <p className="alternative-text">Want to host a party instead?</p>
           <button
             onClick={() => navigate('/create')}
             className="alternative-btn"

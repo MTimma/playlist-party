@@ -266,9 +266,28 @@ export const Party = () => {
     return playlistCollection.songs[trackUri]?.addedBy || null;
   };
 
-  const getCurrentComment = (): string | null => {
+  // Helper function to convert promptKey to readable prompt text
+  const getPromptText = (promptKey: string): string => {
+    const prompts: Record<string, string> = {
+      'first_heard': 'What were you doing when you first heard this song?',
+      'reminds_who': 'Who does this song remind you of?',
+      'heard_where': 'Where did you hear it?',
+      'why_special': 'Why is it special?'
+    };
+    return prompts[promptKey] || '';
+  };
+
+  const getCurrentComment = (): { prompt: string | null; text: string } | null => {
     if (!playlistCollection || !currentTrack) return null;
-    return playlistCollection.songs[currentTrack.uri]?.comment?.text || null;
+    
+    const comment = playlistCollection.songs[currentTrack.uri]?.comment;
+    if (!comment?.text) return null;
+    
+    const prompt = comment.promptKey ? getPromptText(comment.promptKey) : null;
+    return {
+      prompt,
+      text: comment.text
+    };
   };
 
   const handleGuess = async (guessedOwnerId: string): Promise<{ isCorrect: boolean; correctOwnerId?: string; correctOwnerName?: string; scoreChange: number }> => {
@@ -494,12 +513,20 @@ export const Party = () => {
               const isGuessWindowOver = elapsedMs >= windowMs;
               const ownerId = getTrackOwner(currentTrack.uri);
               const owner = ownerId ? lobby?.players[ownerId] : null;
-              const note = getCurrentComment();
+              const comment = getCurrentComment();
               return (
                 <div style={{marginTop:12, display:'flex', flexDirection:'column', gap:8, alignItems:'center'}}>
-                  {note && (
+                  {comment && (
                     <div style={{background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:8, padding:'8px 12px'}}>
-                      <strong>Song note:</strong> {note}
+                      <strong>Song note:</strong>
+                      {comment.prompt ? (
+                        <div className="hint-with-prompt">
+                          <div className="hint-prompt">{comment.prompt}</div>
+                          <div className="hint-answer">{comment.text}</div>
+                        </div>
+                      ) : (
+                        <span> {comment.text}</span>
+                      )}
                     </div>
                   )}
                   <div style={{display:'flex', alignItems:'center', gap:8}}>
