@@ -1,0 +1,47 @@
+.heart-animation {
+  position: absolute;
+  pointer-events: none;
+  font-size: 24px;
+  z-index: 1000;
+  animation: floatUpHeart 2s ease-out forwards;
+  user-select: none;
+}
+
+.heart-animation.heart {
+  color: #FF3B30;
+  filter: drop-shadow(0 2px 4px rgba(255, 59, 48, 0.3));
+}
+
+.heart-animation.thumbs {
+  color: #007AFF;
+  filter: drop-shadow(0 2px 4px rgba(0, 122, 255, 0.3));
+}
+
+.heart-animation.fire {
+  color: #FF9500;
+  filter: drop-shadow(0 2px 4px rgba(255, 149, 0, 0.3));
+}
+
+@keyframes floatUpHeart {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1.2) rotate(-5deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-25px) scale(1.1) rotate(5deg);
+  }
+  75% {
+    opacity: 0.4;
+    transform: translateY(-40px) scale(1.05) rotate(-2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px) scale(0.8) rotate(0deg);
+  }
+}
+

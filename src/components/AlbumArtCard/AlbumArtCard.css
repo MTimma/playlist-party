@@ -1,0 +1,226 @@
+.album-art-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 48px;
+  text-align: center;
+  transition: all 0.3s ease-out;
+  backdrop-filter: blur(20px);
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.album-art-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.album-art-image {
+  width: 300px;
+  height: 300px;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  margin: 0 auto 32px;
+  transition: all 0.2s ease-out;
+  object-fit: cover;
+  display: block;
+}
+
+.album-art-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.track-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.track-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1D1D1F;
+  margin: 0;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 400px;
+}
+
+.track-artists {
+  font-size: 18px;
+  color: #86868B;
+  margin: 0;
+  font-weight: 500;
+  text-align: center;
+}
+
+.track-meta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.added-by-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+  font-size: 14px;
+  color: #86868B;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.owner-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 122, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+  color: #007AFF;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid rgba(0, 122, 255, 0.2);
+}
+
+.owner-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  transition: all 0.3s ease-out;
+}
+
+.owner-mask.revealed {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.owner-name {
+  font-weight: 600;
+  color: #1D1D1F;
+  transition: all 0.2s ease-out;
+}
+
+.comment-display {
+  background: rgba(0, 122, 255, 0.05);
+  border: 1px solid rgba(0, 122, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 16px;
+  max-width: 400px;
+  text-align: left;
+}
+
+.comment-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #007AFF;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.comment-with-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-prompt {
+  color: #86868B;
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.comment-text {
+  color: #1D1D1F;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .album-art-card {
+    padding: 32px 24px;
+    margin: 0 16px;
+  }
+  
+  .album-art-image {
+    width: 250px;
+    height: 250px;
+    margin-bottom: 24px;
+  }
+  
+  .track-title {
+    font-size: 20px;
+  }
+  
+  .track-artists {
+    font-size: 16px;
+  }
+  
+  .comment-display {
+    padding: 16px;
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .album-art-card {
+    padding: 24px 16px;
+    border-radius: 16px;
+  }
+  
+  .album-art-image {
+    width: 200px;
+    height: 200px;
+    margin-bottom: 20px;
+  }
+  
+  .track-title {
+    font-size: 18px;
+  }
+  
+  .track-artists {
+    font-size: 15px;
+  }
+  
+  .added-by-info {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  
+  .owner-avatar {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .comment-display {
+    padding: 12px;
+    border-radius: 12px;
+  }
+  
+  .comment-text {
+    font-size: 15px;
+  }
+}
+

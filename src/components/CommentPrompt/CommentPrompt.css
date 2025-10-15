@@ -1,0 +1,364 @@
+.comment-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.comment-prompt-modal {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideInUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1D1D1F;
+  margin: 0 0 8px 0;
+  line-height: 1.2;
+}
+
+.modal-subtitle {
+  font-size: 16px;
+  color: #86868B;
+  margin: 0;
+  font-weight: 500;
+}
+
+.prompt-section {
+  margin-bottom: 24px;
+}
+
+.prompt-toggle {
+  margin-bottom: 16px;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-input {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  background: #E5E5EA;
+  border-radius: 14px;
+  transition: all 0.2s ease-out;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.2s ease-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toggle-input:checked + .toggle-slider {
+  background: #007AFF;
+}
+
+.toggle-input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  font-weight: 600;
+  font-size: 16px;
+  color: #1D1D1F;
+}
+
+.prompt-display {
+  background: rgba(0, 122, 255, 0.05);
+  border: 1px solid rgba(0, 122, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prompt-text {
+  font-size: 16px;
+  color: #1D1D1F;
+  font-weight: 500;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.regenerate-btn {
+  background: rgba(0, 122, 255, 0.1);
+  border: 1px solid rgba(0, 122, 255, 0.2);
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #007AFF;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  align-self: flex-start;
+}
+
+.regenerate-btn:hover {
+  background: rgba(0, 122, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.regenerate-btn:active {
+  transform: translateY(0);
+}
+
+.comment-input-section {
+  margin-bottom: 24px;
+}
+
+.comment-textarea {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  font-size: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1D1D1F;
+  background: rgba(255, 255, 255, 0.8);
+  resize: vertical;
+  min-height: 100px;
+  transition: all 0.2s ease-out;
+  box-sizing: border-box;
+}
+
+.comment-textarea:focus {
+  outline: none;
+  border-color: #007AFF;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.comment-textarea::placeholder {
+  color: #86868B;
+}
+
+.character-count {
+  text-align: right;
+  font-size: 12px;
+  color: #86868B;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.skip-btn {
+  flex: 1;
+  padding: 12px 24px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #86868B;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+
+.skip-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.skip-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submit-btn {
+  flex: 2;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #007AFF, #5AC8FA);
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  box-shadow: 0 2px 16px rgba(0, 122, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 24px rgba(0, 122, 255, 0.4);
+  filter: brightness(1.05);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.submit-spinner {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.submit-spinner .spinner-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: white;
+  animation: spinnerBounce 1.4s ease-in-out infinite both;
+}
+
+.submit-spinner .spinner-dot:nth-child(1) { animation-delay: -0.32s; }
+.submit-spinner .spinner-dot:nth-child(2) { animation-delay: -0.16s; }
+
+.modal-footer {
+  text-align: center;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.footer-text {
+  font-size: 14px;
+  color: #86868B;
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spinnerBounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .comment-prompt-overlay {
+    padding: 16px;
+  }
+  
+  .comment-prompt-modal {
+    padding: 24px;
+    border-radius: 20px;
+  }
+  
+  .modal-title {
+    font-size: 18px;
+  }
+  
+  .modal-subtitle {
+    font-size: 15px;
+  }
+  
+  .prompt-text {
+    font-size: 15px;
+  }
+  
+  .comment-textarea {
+    padding: 12px;
+    font-size: 15px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .skip-btn,
+  .submit-btn {
+    flex: none;
+    padding: 10px 20px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .comment-prompt-modal {
+    padding: 20px;
+    border-radius: 16px;
+  }
+  
+  .modal-title {
+    font-size: 16px;
+  }
+  
+  .toggle-label {
+    font-size: 15px;
+  }
+  
+  .prompt-display {
+    padding: 16px;
+  }
+  
+  .comment-textarea {
+    min-height: 80px;
+  }
+}
+
