@@ -139,6 +139,9 @@ const setupAutoEndScheduler = () => {
           // Stop any active watcher
           trackWatcherManager.stopWatcher(lobbyId);
 
+          // Delete playlist data
+          await db.collection('playlists').doc(lobbyId).delete();
+
           // Delete lobby
           await lobbyRef.delete();
 
@@ -921,11 +924,14 @@ app.post('/api/party/:lobbyId/end', (async (req, res) => {
       autoEnded: autoEnd || false
     };
 
-    // Write game result BEFORE deleting lobby (to keep data)
+    // Write game result BEFORE deleting data (to keep data)
     await db.collection('party_results').doc(lobbyId).set(resultDoc);
 
     // Stop any active watcher
     trackWatcherManager.stopWatcher(lobbyId);
+
+    // Delete playlist data
+    await db.collection('playlists').doc(lobbyId).delete();
 
     // Delete lobby to clean up and stop snapshot updates
     await lobbyRef.delete();

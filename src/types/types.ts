@@ -25,6 +25,13 @@ export interface Track {
   };
 }
 
+export interface TrackWithComment extends Track {
+  comment?: {
+    text: string;
+    promptKey?: string;
+  };
+}
+
 // NEW - Spotify user profile information returned by the backend `/me` endpoint
 export interface SpotifyUser {
   id: string;

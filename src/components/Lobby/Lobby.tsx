@@ -42,6 +42,16 @@ export const Lobby = () => {
         // Subscribe to lobby updates
         const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
           if (lobbyData) {
+            // Check if current user is a member of this lobby
+            const isUserInLobby = lobbyData.players && user.uid in lobbyData.players;
+            
+            if (!isUserInLobby) {
+              // User is not a member of this lobby, redirect to join page
+              console.log('User not in lobby, redirecting to join page');
+              navigate(`/join?lobby=${lobbyId}`);
+              return;
+            }
+            
             setLobby(lobbyData);
             setError('');
             

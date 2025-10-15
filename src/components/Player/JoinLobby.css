@@ -99,6 +99,17 @@
   text-align: center;
 }
 
+.checking-membership {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.checking-membership p {
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 1rem;
+  font-size: 1rem;
+}
+
 .join-lobby-btn {
   width: 100%;
   padding: 1rem 1.5rem;

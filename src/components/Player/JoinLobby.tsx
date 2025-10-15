@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { joinLobby } from '../../services/firebase';
+import { joinLobby, getCurrentUser } from '../../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import type { Lobby } from '../../types/types';
 import './JoinLobby.css';
 
 export const JoinLobby = () => {
   const [playerName, setPlayerName] = useState('');
   const [lobbyId, setLobbyId] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -14,11 +18,54 @@ export const JoinLobby = () => {
   // Check if lobby ID is provided in URL params
   const urlLobbyId = searchParams.get('lobby');
   
-  useState(() => {
+  useEffect(() => {
     if (urlLobbyId) {
       setLobbyId(urlLobbyId);
     }
-  });
+  }, [urlLobbyId]);
+
+  // Check if user is already a member of this lobby
+  useEffect(() => {
+    const checkExistingMembership = async () => {
+      if (!urlLobbyId) {
+        setIsChecking(false);
+        return;
+      }
+      
+      try {
+        const user = getCurrentUser();
+        if (!user) {
+          setIsChecking(false);
+          return;
+        }
+        
+        const lobbyRef = doc(db, 'lobbies', urlLobbyId);
+        const lobbyDoc = await getDoc(lobbyRef);
+        
+        if (lobbyDoc.exists()) {
+          const lobby = lobbyDoc.data() as Lobby;
+          
+          // Check if user is already in this lobby
+          if (lobby.players && user.uid in lobby.players) {
+            console.log('User already in lobby, redirecting...');
+            // Navigate to appropriate page based on lobby status
+            if (lobby.status === 'in_progress') {
+              navigate(`/party/${urlLobbyId}`);
+            } else {
+              navigate(`/lobby/${urlLobbyId}`);
+            }
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking membership:', error);
+      }
+      
+      setIsChecking(false);
+    };
+    
+    checkExistingMembership();
+  }, [urlLobbyId, navigate]);
 
   const handleJoinLobby = async () => {
     if (!playerName.trim()) {
@@ -38,9 +85,9 @@ export const JoinLobby = () => {
       await joinLobby(lobbyId.trim(), playerName.trim());
       // Navigate to the lobby as a guest
       navigate(`/lobby/${lobbyId.trim()}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error joining lobby:', error);
-      setError(error.message || 'Failed to join lobby. Please check the lobby ID and try again.');
+      setError(error instanceof Error ? error.message : 'Failed to join lobby. Please check the lobby ID and try again.');
       setIsJoining(false);
     }
   };
@@ -50,6 +97,20 @@ export const JoinLobby = () => {
       handleJoinLobby();
     }
   };
+
+  // Show loading while checking membership
+  if (isChecking) {
+    return (
+      <div className="join-lobby-container">
+        <div className="join-lobby-card">
+          <div className="checking-membership">
+            <div className="spinner"></div>
+            <p>Checking your membership...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="join-lobby-container">

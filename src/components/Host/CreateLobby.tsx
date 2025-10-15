@@ -8,7 +8,7 @@ export const CreateLobby = () => {
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [isCreating, setIsCreating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [spotifyUser, setSpotifyUser] = useState<any>(null);
+  const [spotifyUser, setSpotifyUser] = useState<{ id: string; display_name: string; images: Array<{ url: string }>; product: string } | null>(null);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
 
@@ -40,6 +40,14 @@ export const CreateLobby = () => {
         credentials: 'include',
       });
       const data = await response.json();
+      
+      // Check if user has premium account
+      if (data.product !== 'premium') {
+        setError('Spotify Premium account required to host');
+        setSpotifyUser(null);
+        return;
+      }
+      
       setSpotifyUser(data);
     } catch (error) {
       console.error('Error fetching Spotify user:', error);
@@ -76,15 +84,16 @@ export const CreateLobby = () => {
     }
   };
 
-  const generateShareableLink = () => {
-    return `${window.location.origin}/join`;
-  };
-
   if (!isAuthenticated) {
     return (
       <div className="create-lobby-container">
         <div className="create-lobby-card">
-          <h1 className="create-lobby-title">Host a Party!</h1>
+          <h1 className="create-lobby-title">Pass the aux, share the vibe!</h1>
+          <p className="landing-description">
+            Build a collaborative playlist and guess who added what! Drop hints, leave comments, 
+            and discover your friends' music secrets! Gone when the party ends. No digital footprint, 
+            just memories!
+          </p>
           <p className="create-lobby-subtitle">
             You need a Premium Spotify account to host a party
           </p>
@@ -105,7 +114,6 @@ export const CreateLobby = () => {
   return (
     <div className="create-lobby-container">
       <div className="create-lobby-card">
-        <h1 className="create-lobby-title">Host a Party!</h1>
         
         {spotifyUser && (
           <div className="host-info">

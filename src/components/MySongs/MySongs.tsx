@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { subscribeUserSongs, removeTrackFromPlaylist, updateTrackComment } from '../../services/firebase';
-import type { Track } from '../../types/types';
+import type { TrackWithComment } from '../../types/types';
 import './MySongs.css';
 
 interface MySongsProps {
@@ -9,7 +9,7 @@ interface MySongsProps {
 }
 
 export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [tracks, setTracks] = useState<TrackWithComment[]>([]);
   const [isExpanded] = useState(true);
   const [activeCommentUri, setActiveCommentUri] = useState<string | null>(null);
   const [commentText, setCommentText] = useState<string>('');
@@ -92,7 +92,16 @@ export const MySongs = ({ lobbyId, userId }: MySongsProps) => {
                 className="preview-btn"
                 aria-label="Add note"
                 title="Add note"
-                onClick={() => { setActiveCommentUri(track.uri); setCommentText(''); setCommentPrompt(''); }}
+                onClick={() => { 
+                  // Toggle: close if already open, otherwise open with existing data
+                  if (activeCommentUri === track.uri) {
+                    setActiveCommentUri(null);
+                  } else {
+                    setActiveCommentUri(track.uri); 
+                    setCommentText(track.comment?.text || ''); 
+                    setCommentPrompt(track.comment?.promptKey || ''); 
+                  }
+                }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z" />

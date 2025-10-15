@@ -34,6 +34,7 @@ export const Party = () => {
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [isEndingGame, setIsEndingGame] = useState(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [showTimeWarning, setShowTimeWarning] = useState(false);
   // Ensure the user is authenticated and keep uid in state
   useEffect(() => {
     let isMounted = true;
@@ -127,9 +128,17 @@ export const Party = () => {
 
   // Subscribe to lobby (now contains game state AND playback state)
   useEffect(() => {
-    if (!lobbyId) return;
+    if (!lobbyId || !currentUserId) return;
     
     const unsubscribe = subscribeLobby(lobbyId, (lobbyData) => {
+      // Check if current user is a member of this lobby
+      if (lobbyData && lobbyData.players && !(currentUserId in lobbyData.players)) {
+        // User is not a member of this lobby, redirect to join page
+        console.log('User not in lobby, redirecting to join page');
+        window.location.href = `/join?lobby=${lobbyId}`;
+        return;
+      }
+      
       setLobby(lobbyData);
       
       if (lobbyData && lobbyData.status === 'in_progress') {
@@ -185,11 +194,15 @@ export const Party = () => {
     });
     
     return () => unsubscribe();
-  }, [lobbyId, currentTrackUri]);
+  }, [lobbyId, currentTrackUri, currentUserId]);
 
   // Countdown to auto-end: 1 hour from lobby.startedAt
   useEffect(() => {
-    if (!lobby || lobby.status !== 'in_progress') { setRemainingMs(null); return; }
+    if (!lobby || lobby.status !== 'in_progress') { 
+      setRemainingMs(null); 
+      setShowTimeWarning(false);
+      return; 
+    }
     const startedAtValue = lobby.startedAt as unknown;
     let startedAtDate: Date | null = null;
     if (startedAtValue && typeof startedAtValue === 'object' && 'toDate' in (startedAtValue as { toDate?: () => Date })) {
@@ -198,13 +211,30 @@ export const Party = () => {
       startedAtDate = startedAtValue as Date;
     }
 
-    if (!startedAtDate) { setRemainingMs(null); return; }
+    if (!startedAtDate) { 
+      setRemainingMs(null); 
+      setShowTimeWarning(false);
+      return; 
+    }
 
     const endAt = new Date(startedAtDate.getTime() + 60 * 60 * 1000);
 
     const tick = () => {
       const ms = Math.max(0, endAt.getTime() - Date.now());
       setRemainingMs(ms);
+      
+      // Show warning at 5 minutes
+      if (ms > 0 && ms <= 5 * 60 * 1000) {
+        setShowTimeWarning(true);
+      }
+      
+      // Auto-end when time expires (only host triggers)
+      if (ms === 0 && lobby.hostFirebaseUid === currentUserId && !isEndingGame && lobbyId) {
+        console.log('Timer expired, auto-ending game...');
+        endGame(lobbyId, true).catch(err => {
+          console.error('Failed to auto-end game on timer:', err);
+        });
+      }
     };
 
     tick();
@@ -437,7 +467,6 @@ export const Party = () => {
   return (
     <div className="game-container">
       <div className="game-header">
-        <div className="round-info">
         </div>
         {lobby?.hostFirebaseUid === currentUserId && (
           <div className="end-game-row">
@@ -455,6 +484,13 @@ export const Party = () => {
           </div>
         )}
       </div>
+
+      {/* Time Warning Banner */}
+      {showTimeWarning && remainingMs !== null && remainingMs > 0 && (
+        <div className="time-warning-banner">
+          ⏰ Party ending soon! {formatRemaining(remainingMs)} remaining
+        </div>
+      )}
 
       {/* Score Board */}
       {lobby?.players && Object.keys(playerScores).length > 0 && (
@@ -601,7 +637,20 @@ export const Party = () => {
         ) : (
           <div className="waiting-for-host">
             <div className="waiting-icon">⏸️</div>
-            <h2>Waiting for Host to play Spotify</h2>
+            <h2>Waiting for music...</h2>
+            {lobby?.playlistName && (
+              <p className="playlist-info">
+                🎵 <strong>{lobby.playlistName}</strong>
+              </p>
+            )}
+            {lobby?.players && lobby.hostFirebaseUid && (
+              <p className="host-info">
+                Hosted by <strong>{lobby.players[lobby.hostFirebaseUid]?.name || 'Unknown'}</strong>
+              </p>
+            )}
+            <p className="waiting-instruction">
+              The host will start playing music on Spotify
+            </p>
             </div>
         )}
       </div>

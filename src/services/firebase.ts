@@ -24,7 +24,7 @@ import {
   connectAuthEmulator
 } from 'firebase/auth';
 
-import type { Lobby, Player, LegacyGameState, Song, Track, TrackProposal, PlaylistCollection, PlayerScore } from '../types/types';
+import type { Lobby, Player, LegacyGameState, Song, Track, TrackWithComment, TrackProposal, PlaylistCollection, PlayerScore } from '../types/types';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -39,7 +39,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services with emulator support
-const db = getFirestore(app);
+export const db = getFirestore(app);
 const auth = getAuth(app);
 
 // Connect to emulators in development mode
@@ -784,7 +784,7 @@ export const subscribePlayerScores = (
 export const subscribeUserSongs = (
   lobbyId: string,
   userId: string,
-  cb: (tracks: Track[]) => void,
+  cb: (tracks: TrackWithComment[]) => void,
 ) => {
   const ref = doc(db, 'playlists', lobbyId);
   return onSnapshot(ref, snap => {
@@ -793,7 +793,10 @@ export const subscribeUserSongs = (
     cb(
       Object.values(songs)
         .filter((s) => s.addedBy === userId)
-        .map((s) => ({ ...s.trackInfo } as Track))
+        .map((s) => ({ 
+          ...s.trackInfo,
+          comment: s.comment ? { text: s.comment.text, promptKey: s.comment.promptKey || '' } : undefined
+        } as TrackWithComment))
     );
   });
 };
