@@ -5,22 +5,27 @@ import { JoinLobby } from './components/Player/JoinLobby';
 import { Party } from './components/Party/Party';
 import SpotifyCallback from './components/SpotifyCallback/SpotifyCallback';
 import { AuthProvider } from './contexts/AuthContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { LanguageSwitcher } from './components/LanguageSwitcher/LanguageSwitcher';
 import './App.css'
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<CreateLobby />} />
-          <Route path="/create" element={<CreateLobby />} />
-          <Route path="/join" element={<JoinLobby />} />
-          <Route path="/lobby/:lobbyId" element={<Lobby />} />
-          <Route path="/party/:lobbyId" element={<Party />} />
-          <Route path="/callback" element={<SpotifyCallback />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <Router>
+          <LanguageSwitcher />
+          <Routes>
+            <Route path="/" element={<CreateLobby />} />
+            <Route path="/create" element={<CreateLobby />} />
+            <Route path="/join" element={<JoinLobby />} />
+            <Route path="/lobby/:lobbyId" element={<Lobby />} />
+            <Route path="/party/:lobbyId" element={<Party />} />
+            <Route path="/callback" element={<SpotifyCallback />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
 

@@ -47,7 +47,7 @@
 .create-lobby-subtitle {
   color: rgba(255, 255, 255, 0.6);
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
   font-size: 0.95rem;
   font-weight: 500;
 }
@@ -243,4 +243,58 @@
     font-size: 1rem;
     margin-bottom: 2rem;
   }
+}
+
+.waitlist-info {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 2px solid rgba(255, 193, 7, 0.3);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.waitlist-warning {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+}
+
+.waitlist-warning strong {
+  color: #ffc107;
+}
+
+.waitlist-btn,
+.waitlist-btn-secondary {
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.waitlist-btn {
+  background: #ffc107;
+  color: #000;
+}
+
+.waitlist-btn:hover {
+  background: #ffca28;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.waitlist-btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.waitlist-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 } 

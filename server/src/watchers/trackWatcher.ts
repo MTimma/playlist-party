@@ -1,5 +1,7 @@
 import axios from 'axios';
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface WatcherState {
   timer: NodeJS.Timeout;
@@ -20,6 +22,9 @@ class TrackWatcherManager {
   private watchers = new Map<string, WatcherState>();
   private config: WatcherConfig;
   private db: admin.firestore.Firestore;
+  private isRateLimited = false;
+  private rateLimitClearsAt = 0;
+  private logDir: string;
 
   constructor(db: admin.firestore.Firestore, config?: Partial<WatcherConfig>) {
     this.db = db;
@@ -28,6 +33,12 @@ class TrackWatcherManager {
       maxConcurrency: config?.maxConcurrency || parseInt(process.env.WATCHER_MAX_CONCURRENCY || '500'),
       defaultBackoffMs: config?.defaultBackoffMs || parseInt(process.env.WATCHER_DEFAULT_BACKOFF_MS || '15000')
     };
+    
+    // Setup log directory for rate limit logging
+    this.logDir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(this.logDir)) {
+      fs.mkdirSync(this.logDir, { recursive: true });
+    }
   }
 
   async startWatcher(
@@ -43,10 +54,25 @@ class TrackWatcherManager {
       return;
     }
 
+    // Check if system is currently rate limited
+    if (this.isRateLimited && Date.now() < this.rateLimitClearsAt) {
+      const waitSeconds = Math.ceil((this.rateLimitClearsAt - Date.now()) / 1000);
+      console.error(`System is rate-limited, refusing to start watcher for lobby: ${lobbyId}. Clears in ${waitSeconds}s`);
+      const error: any = new Error(`Server is temporarily rate-limited by Spotify. Please wait ${waitSeconds} seconds and try again.`);
+      error.code = 'RATE_LIMITED';
+      error.currentParties = this.watchers.size;
+      error.retryAfterSeconds = waitSeconds;
+      throw error;
+    }
+
     // Check concurrency limit
     if (this.watchers.size >= this.config.maxConcurrency) {
       console.error(`Max concurrency reached (${this.config.maxConcurrency}), refusing to start watcher for lobby: ${lobbyId}`);
-      throw new Error('Maximum concurrent watchers exceeded');
+      const error: any = new Error('Maximum concurrent parties exceeded');
+      error.code = 'PARTY_LIMIT_REACHED';
+      error.currentParties = this.watchers.size;
+      error.maxParties = this.config.maxConcurrency;
+      throw error;
     }
 
     // Guard against token reuse across lobbies
@@ -152,6 +178,10 @@ class TrackWatcherManager {
         hasTrackData: !!updateData.currentTrack
       });
 
+      // Clear network issue flag on successful update
+      updateData.networkIssue = false;
+      updateData.networkIssueMessage = null;
+
       await this.db.collection('lobbies').doc(lobbyId).update(updateData);
 
     } catch (error) {
@@ -165,7 +195,25 @@ class TrackWatcherManager {
           const retryAfter = error.response.headers['retry-after'];
           const backoffMs = retryAfter ? (parseInt(retryAfter) * 1000) : this.config.defaultBackoffMs;
           watcherState.pauseUntil = Date.now() + backoffMs + 200; // Add 200ms buffer
-          console.log(`Rate limited for lobby ${lobbyId}, backing off for ${backoffMs}ms`);
+          
+          // Set global rate limit flag to block new parties
+          this.isRateLimited = true;
+          this.rateLimitClearsAt = Date.now() + backoffMs + 1000; // Add 1s buffer
+          
+          console.warn(`⚠️  RATE LIMITED for lobby ${lobbyId}, backing off for ${backoffMs}ms`);
+          console.warn(`⚠️  Blocking new parties until ${new Date(this.rateLimitClearsAt).toISOString()}`);
+          
+          // Log concurrent watcher count to file for analysis
+          this.logRateLimitEvent(lobbyId, backoffMs);
+          
+          // Update lobby with network issue warning
+          await this.db.collection('lobbies').doc(lobbyId).update({
+            networkIssue: true,
+            networkIssueMessage: 'Experiencing network issues. Playback tracking may be delayed.',
+            networkIssueAt: admin.firestore.FieldValue.serverTimestamp()
+          }).catch(err => {
+            console.error(`Failed to update lobby with network issue flag:`, err);
+          });
         } else if (error.response?.status === 204) {
           // No content - player is not active, but this is not an error
           console.log(`No active playback for lobby ${lobbyId} (204 response)`);
@@ -258,6 +306,45 @@ class TrackWatcherManager {
     console.log(`Stopping all ${this.watchers.size} watchers...`);
     for (const [lobbyId] of this.watchers.entries()) {
       this.stopWatcher(lobbyId);
+    }
+  }
+
+  // Get rate limit status
+  getRateLimitStatus(): { isRateLimited: boolean; clearsAt: number; clearsInSeconds: number } {
+    const now = Date.now();
+    const clearsInSeconds = this.isRateLimited && this.rateLimitClearsAt > now 
+      ? Math.ceil((this.rateLimitClearsAt - now) / 1000)
+      : 0;
+    
+    return {
+      isRateLimited: this.isRateLimited && this.rateLimitClearsAt > now,
+      clearsAt: this.rateLimitClearsAt,
+      clearsInSeconds
+    };
+  }
+
+  // Log rate limit event to file for analysis
+  private logRateLimitEvent(lobbyId: string, backoffMs: number): void {
+    try {
+      const timestamp = new Date().toISOString();
+      const logEntry = {
+        timestamp,
+        lobbyId,
+        concurrentWatchers: this.watchers.size,
+        backoffMs,
+        activeLobbies: Array.from(this.watchers.keys())
+      };
+      
+      const logLine = JSON.stringify(logEntry) + '\n';
+      const logFile = path.join(this.logDir, 'rate-limits.log');
+      
+      fs.appendFileSync(logFile, logLine, 'utf8');
+      
+      console.log(`📝 Logged rate limit event to ${logFile}`);
+      console.log(`📊 Concurrent watchers at time of 429: ${this.watchers.size}`);
+      console.log(`📊 Active lobbies: ${logEntry.activeLobbies.join(', ')}`);
+    } catch (error) {
+      console.error('Failed to log rate limit event:', error);
     }
   }
 }

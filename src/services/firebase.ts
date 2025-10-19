@@ -14,7 +14,9 @@ import {
   increment,
   runTransaction,
   deleteField,
-  connectFirestoreEmulator
+  connectFirestoreEmulator,
+  getDocs,
+  addDoc
 } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -310,6 +312,28 @@ export const startGameWithPlaylist = async (lobbyId: string, playlistName: strin
 
   if (!response.ok) {
     const error = await response.json();
+    
+    // Handle specific error codes
+    if (error.error === 'party_limit_reached') {
+      const limitError = new Error(
+        `Maximum concurrent parties exceeded (${error.currentParties}/${error.maxParties} active). Please try again in a few minutes.`
+      ) as Error & { code: string; currentParties: number; maxParties: number };
+      limitError.code = 'PARTY_LIMIT_REACHED';
+      limitError.currentParties = error.currentParties;
+      limitError.maxParties = error.maxParties;
+      throw limitError;
+    }
+    
+    // Handle rate limit error
+    if (error.error === 'rate_limited') {
+      const rateLimitError = new Error(
+        error.message || `Server is temporarily rate-limited by Spotify. Please wait ${error.retryAfterSeconds || 'a moment'} and try again.`
+      ) as Error & { code: string; retryAfterSeconds?: number };
+      rateLimitError.code = 'RATE_LIMITED';
+      rateLimitError.retryAfterSeconds = error.retryAfterSeconds;
+      throw rateLimitError;
+    }
+    
     throw new Error(error.error || 'Failed to create playlist');
   }
 
@@ -884,4 +908,33 @@ export const subscribeGameResult = (
       try { innerUnsub(); } catch { /* no-op */ }
     }
   };
+};
+
+// Add email to waitlist
+export const addToWaitlist = async (email: string): Promise<void> => {
+  await signInAnonymouslyIfNeeded();
+  
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error('Invalid email address');
+  }
+
+  // Check if email already exists
+  const waitlistRef = collection(db, 'waitlist');
+  const q = query(waitlistRef, where('email', '==', email.toLowerCase()));
+  const existingDocs = await getDocs(q);
+  
+  if (!existingDocs.empty) {
+    throw new Error('This email is already on the waitlist');
+  }
+
+  // Add to waitlist with consent tracking
+  await addDoc(waitlistRef, {
+    email: email.toLowerCase(),
+    submittedAt: serverTimestamp(),
+    consentGiven: true,
+    consentTimestamp: serverTimestamp(),
+    status: 'pending'
+  });
 };

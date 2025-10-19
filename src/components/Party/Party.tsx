@@ -466,8 +466,14 @@ export const Party = () => {
 
   return (
     <div className="game-container">
-      <div className="game-header">
+      {/* Network issue warning banner */}
+      {lobby?.networkIssue && lobby?.networkIssueMessage && (
+        <div className="network-warning-banner">
+          ⚠️ {lobby.networkIssueMessage}
         </div>
+      )}
+      
+      <div className="game-header">
         {lobby?.hostFirebaseUid === currentUserId && (
           <div className="end-game-row">
             <button className="end-game-btn" onClick={handleEndGameClick} disabled={isEndingGame}>

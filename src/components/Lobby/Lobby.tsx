@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { subscribeLobby, signInAnonymouslyIfNeeded, leaveLobby, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
+import { subscribeLobby, signInAnonymouslyIfNeeded, togglePlayerReady, startGameWithPlaylist } from '../../services/firebase';
 import { PlayerList } from './PlayerList';
 import { ReadyButton } from '../ReadyButton/ReadyButton';
 import { PlaylistNameDialog } from '../PlaylistNameDialog/PlaylistNameDialog';
@@ -144,43 +144,26 @@ export const Lobby = () => {
     try {
       await startGameWithPlaylist(lobbyId, playlistName);
       setShowPlaylistDialog(false);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error starting game:', error);
-      setError('Failed to start game. Please try again.');
+      
+      const err = error as { code?: string; message?: string };
+      
+      // Display user-friendly error message based on error type
+      if (err.code === 'PARTY_LIMIT_REACHED') {
+        setError(err.message || 'Too many games in progress. Please try again in a few minutes.');
+      } else if (err.code === 'RATE_LIMITED') {
+        setError(err.message || 'Server is temporarily experiencing high load. Please try again in a moment.');
+      } else {
+        setError('Failed to start game. Please try again.');
+      }
+      
       setShowPlaylistDialog(false);
     }
   };
 
   const handleStartGameCancel = () => {
     setShowPlaylistDialog(false);
-  };
-
-  const handleLeaveLobby = async () => {
-    if (!lobbyId) return;
-    
-    try {
-      await leaveLobby(lobbyId);
-      navigate('/');
-    } catch (error) {
-      console.error('Error leaving lobby:', error);
-    }
-  };
-
-  const getStatusMessage = () => {
-    if (!lobby) return '';
-    
-    switch (lobby.status) {
-      case 'waiting':
-        return 'Waiting for players to join';
-      case 'collecting_songs':
-        return 'Players are adding songs to the playlist';
-      case 'in_progress':
-        return 'Game is in progress';
-      case 'finished':
-        return 'Game has finished';
-      default:
-        return '';
-    }
   };
 
   const getCurrentPlayer = () => {

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createLobby } from '../../services/firebase';
+import { createLobby, addToWaitlist } from '../../services/firebase';
+import { WaitlistModal } from '../WaitlistModal/WaitlistModal';
+import { useLanguage } from '../../hooks/useLanguage';
 import './CreateLobby.css';
 
 export const CreateLobby = () => {
@@ -10,7 +12,9 @@ export const CreateLobby = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [spotifyUser, setSpotifyUser] = useState<{ id: string; display_name: string; images: Array<{ url: string }>; product: string } | null>(null);
   const [error, setError] = useState<string>('');
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   useEffect(() => {
     checkAuthStatus();
@@ -88,25 +92,39 @@ export const CreateLobby = () => {
     return (
       <div className="create-lobby-container">
         <div className="create-lobby-card">
-          <h1 className="create-lobby-title">Pass the aux, share the vibe!</h1>
+          <h1 className="create-lobby-title">{t('landing.title')}</h1>
           <p className="landing-description">
-            Build a collaborative playlist and guess who added what! Drop hints, leave comments, 
-            and discover your friends' music secrets! Gone when the party ends. No digital footprint, 
-            just memories!
+            {t('landing.description')}
           </p>
           <p className="create-lobby-subtitle">
-            You need a Premium Spotify account to host a party
+            {t('landing.premiumRequired')}
           </p>
           <button className="spotify-login-btn" onClick={handleSpotifyLogin}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
             </svg>
-            Connect Spotify Account
+            {t('landing.connectSpotify')}
           </button>
           <p className="create-lobby-subtitle">
-            Powered by Spotify
+            {t('landing.poweredBy')}
           </p>
+          <div className="waitlist-info">
+            <p className="waitlist-warning">
+              {t('landing.limitedAvailability')} {t('landing.limitText')}
+            </p>
+            <button className="waitlist-btn" onClick={() => setShowWaitlistModal(true)}>
+              {t('landing.joinWaitlist')}
+            </button>
+          </div>
+          
+          
         </div>
+        
+        <WaitlistModal 
+          isOpen={showWaitlistModal}
+          onClose={() => setShowWaitlistModal(false)}
+          onSubmit={addToWaitlist}
+        />
       </div>
     );
   }
@@ -126,8 +144,8 @@ export const CreateLobby = () => {
                 />
               )}
               <div>
-                <p className="host-name">Welcome, {spotifyUser.display_name}!</p>
-                <p className="host-subtitle">You'll be hosting this party</p>
+                <p className="host-name">{t('lobby.welcome')}, {spotifyUser.display_name}!</p>
+                <p className="host-subtitle">{t('lobby.hostingParty')}</p>
               </div>
             </div>
           </div>
@@ -136,14 +154,14 @@ export const CreateLobby = () => {
         <div className="create-lobby-form">
           <div className="form-group">
             <label htmlFor="hostName" className="form-label">
-              Your Party Nickname
+              {t('lobby.partyNickname')}
             </label>
             <input
               id="hostName"
               type="text"
               value={hostName}
               onChange={(e) => setHostName(e.target.value)}
-              placeholder="Enter your name"
+              placeholder={t('lobby.enterYourName')}
               className="form-input"
               disabled={isCreating}
               maxLength={30}
@@ -152,7 +170,7 @@ export const CreateLobby = () => {
 
           <div className="form-group">
             <label htmlFor="maxPlayers" className="form-label">
-              Maximum Players
+              {t('lobby.maxPlayers')}
             </label>
             <select
               id="maxPlayers"
@@ -161,10 +179,10 @@ export const CreateLobby = () => {
               className="form-select"
               disabled={isCreating}
             >
-              <option value={4}>4 Players</option>
-              <option value={6}>6 Players</option>
-              <option value={8}>8 Players</option>
-              <option value={10}>10 Players</option>
+              <option value={4}>4 {t('lobby.players')}</option>
+              <option value={6}>6 {t('lobby.players')}</option>
+              <option value={8}>8 {t('lobby.players')}</option>
+              <option value={10}>10 {t('lobby.players')}</option>
             </select>
           </div>
 
@@ -182,20 +200,26 @@ export const CreateLobby = () => {
             {isCreating ? (
               <>
                 <div className="spinner"></div>
-                Creating Lobby...
+                {t('lobby.creatingLobby')}
               </>
             ) : (
-              'Create Lobby'
+              t('lobby.createLobby')
             )}
           </button>
 
           <div className="share-info">
             <p className="share-text">
-              Once created, you'll get a shareable link for players to join
+              {t('lobby.shareInfo')}
             </p>
           </div>
         </div>
       </div>
+      
+      <WaitlistModal 
+        isOpen={showWaitlistModal}
+        onClose={() => setShowWaitlistModal(false)}
+        onSubmit={addToWaitlist}
+      />
     </div>
   );
 }; 

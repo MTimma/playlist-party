@@ -564,9 +564,33 @@ app.post('/api/spotify/playlist', (async (req, res) => {
         );
         
         console.log('Watcher started successfully for lobby:', lobbyId);
-      } catch (watcherError) {
+      } catch (watcherError: unknown) {
         console.error('Failed to start watcher for lobby:', lobbyId, watcherError);
-        // Don't fail the playlist creation, but log the error
+        
+        const error = watcherError as { code?: string; message?: string; currentParties?: number; maxParties?: number; retryAfterSeconds?: number };
+        
+        // If party limit reached, fail the playlist creation with detailed error
+        if (error.code === 'PARTY_LIMIT_REACHED') {
+          return res.status(429).json({
+            error: 'party_limit_reached',
+            message: error.message || 'Maximum concurrent parties exceeded',
+            currentParties: error.currentParties,
+            maxParties: error.maxParties
+          });
+        }
+        
+        // If system is rate limited, fail with specific error
+        if (error.code === 'RATE_LIMITED') {
+          return res.status(503).json({
+            error: 'rate_limited',
+            message: error.message || 'Server is temporarily rate-limited',
+            currentParties: error.currentParties,
+            retryAfterSeconds: error.retryAfterSeconds
+          });
+        }
+        
+        // For other watcher errors, don't fail playlist creation but log it
+        console.warn('Watcher failed to start but continuing with playlist creation');
       }
     }
 
@@ -971,6 +995,21 @@ app.get('/api/health/watchers', (req, res) => {
     activeWatchers: watcherCount,
     timestamp: new Date().toISOString(),
     status: 'healthy'
+  });
+});
+
+// Server status endpoint including rate limit information
+app.get('/api/server/status', (req, res) => {
+  const watcherCount = trackWatcherManager.getWatcherCount();
+  const rateLimitStatus = trackWatcherManager.getRateLimitStatus();
+  const maxParties = parseInt(process.env.WATCHER_MAX_CONCURRENCY || '500');
+  
+  res.json({
+    activeParties: watcherCount,
+    maxParties,
+    isRateLimited: rateLimitStatus.isRateLimited,
+    rateLimitClearsInSeconds: rateLimitStatus.clearsInSeconds,
+    timestamp: new Date().toISOString()
   });
 });
 

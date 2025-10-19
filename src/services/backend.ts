@@ -115,4 +115,5 @@ export const endGame = async (lobbyId: string, autoEnd: boolean = false): Promis
     const error = await response.json().catch(() => ({}));
     throw new Error(error.error || 'Failed to end game');
   }
-}; 
+};
+ 

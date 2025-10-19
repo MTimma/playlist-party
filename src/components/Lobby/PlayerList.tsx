@@ -76,14 +76,6 @@ export const PlayerList = ({ players, maxPlayers, currentUserId }: PlayerListPro
     }
   };
 
-  const getPlayerInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase())
-      .slice(0, 2)
-      .join('');
-  };
-
   return (<>
     {/* <div className="player-list-header">
         <h3 className="player-list-title">Players</h3>

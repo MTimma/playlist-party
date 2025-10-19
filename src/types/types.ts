@@ -67,6 +67,11 @@ export interface Lobby {
   guessWindowMs?: number; // default 30000
   disableGuessing?: boolean;
   
+  // Network issue tracking (rate limits)
+  networkIssue?: boolean;
+  networkIssueMessage?: string;
+  networkIssueAt?: Date | Timestamp;
+  
   playerScores?: {
     [playerId: string]: number;
   };
